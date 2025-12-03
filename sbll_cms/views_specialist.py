@@ -58,7 +58,7 @@ def manage_situation(language: str, slug: str):
         node = {"gloss": gloss, "children": build_part_nodes(gloss, resolve)}
         root_nodes.append(node)
 
-    tree_lines = render_tree(root_nodes)
+    tree_lines = render_tree(root_nodes, target_language=target_language, storage=storage)
 
     # Flatten nodes for translation table
     flat_glosses = dedupe_glosses(root_nodes)
@@ -145,7 +145,7 @@ def build_part_nodes(gloss, resolve_func):
     return children
 
 
-def render_tree(nodes):
+def render_tree(nodes, target_language: str = "", storage=None):
     lines: list[str] = []
 
     def label_for(gloss):
@@ -160,11 +160,29 @@ def render_tree(nodes):
             connector = "└── " if is_last else "├── "
             lines.append(f"{prefix}{connector}{label_for(node['gloss'])}")
             new_prefix = f"{prefix}{'    ' if is_last else '│   '}"
-            if node["children"]:
-                walk(node["children"], new_prefix)
+            combined_children = list(node["children"])
+            if target_language and storage:
+                translations = [ref for ref in (node["gloss"].translations or []) if ref.startswith(f"{target_language}:")]
+                for t_ref in translations:
+                    t_gloss = storage.resolve_reference(t_ref)
+                    if not t_gloss:
+                        continue
+                    combined_children.append({"gloss": t_gloss, "children": build_part_nodes(t_gloss, storage.resolve_reference)})
+            if combined_children:
+                walk(combined_children, new_prefix)
 
     walk(nodes)
     return lines
+
+
+def resolve_parts(gloss):
+    storage = get_storage()
+    parts = []
+    for ref in gloss.parts:
+        part = storage.resolve_reference(ref)
+        if part:
+            parts.append(part)
+    return parts
 
 
 def dedupe_glosses(nodes):

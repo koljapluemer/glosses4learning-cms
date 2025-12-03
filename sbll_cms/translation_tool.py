@@ -40,7 +40,7 @@ def translate(req: TranslationRequest, settings: Settings, language_store: Langu
 
     ai_note = ""
     target_lang_obj = language_store.get(req.target_language)
-    if target_lang_obj and getattr(target_lang_obj, "ai_note", None):
+    if target_lang_obj and getattr(target_lang_obj, "aiNote", None):
         ai_note = target_lang_obj.ai_note
 
     key = settings.api_keys.openai
@@ -50,12 +50,20 @@ def translate(req: TranslationRequest, settings: Settings, language_store: Langu
 
 
 def _translate_openai(req: TranslationRequest, api_key: str, ai_note: str) -> TranslationResult:
-    prompt = (
-        f"Translate the following gloss into {req.target_language}. "
-        "Return a JSON object with a 'translations' array of translation strings. Keep them concise."
-    )
+    is_paraphrase = req.context and "[paraphrase]" in req.context
+    if is_paraphrase:
+        prompt = (
+            f"Imagine the learner wants to '{req.gloss.content}' in {req.target_language}. "
+            "Return multiple natural options on how to do this. "
+            "Return a JSON object with a 'translations' array expressions."
+        )
+    else:
+        prompt = (
+            f"Translate the following gloss into {req.target_language}. "
+            "Return a JSON object with a 'translations' array of translation strings. Keep them concise."
+        )
     if ai_note:
-        prompt += f" Notes for this language: {ai_note}"
+        prompt += f" Notes for this language: {ai_note}."
     if req.context:
         prompt += f" Additional context: {req.context}"
     prompt += f" Gloss: {req.gloss.content}"

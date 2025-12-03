@@ -20,7 +20,7 @@ class Language:
             iso_code=data.get("isoCode", "").strip().lower(),
             display_name=data.get("displayName", "").strip(),
             symbol=data.get("symbol", "").strip(),
-            ai_note=data.get("ai_note") or data.get("aiNote"),
+            ai_note=data.get("aiNote") or data.get("aiNote"),
         )
 
 
