@@ -88,10 +88,11 @@ class GlossStorage:
         if (language != original_language or slug != original_slug) and target.exists():
             raise FileExistsError(f"A gloss already exists for {language}:{slug}")
 
-        self._write_gloss(target, gloss)
-        if target != original_path and original_path.exists():
-            original_path.unlink()
+        # If core identity changed, perform rename/refactor.
+        if language != original_language or slug != original_slug:
+            return self.rename_gloss(original_language, original_slug, language, slug, gloss)
 
+        self._write_gloss(target, gloss)
         gloss.slug = slug
         gloss.language = language
         return gloss
@@ -105,6 +106,49 @@ class GlossStorage:
         payload = gloss.to_dict()
         with path.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, ensure_ascii=False)
+
+    def rename_gloss(self, old_language: str, old_slug: str, new_language: str, new_slug: str, gloss: Gloss) -> Gloss:
+        """Rename gloss file and rewrite all references in the dataset."""
+        old_language = normalize_language_code(old_language)
+        new_language = normalize_language_code(new_language)
+        old_ref = f"{old_language}:{old_slug}"
+        new_ref = f"{new_language}:{new_slug}"
+
+        # Save new file first.
+        new_path = self._path_for(new_language, new_slug)
+        if new_path.exists() and (new_language != old_language or new_slug != old_slug):
+            raise FileExistsError(f"Target gloss already exists: {new_language}:{new_slug}")
+
+        gloss.language = new_language
+        gloss.slug = new_slug
+        self._write_gloss(new_path, gloss)
+
+        # Remove old file if different.
+        old_path = self._path_for(old_language, old_slug)
+        if old_path.exists() and old_path != new_path:
+            old_path.unlink()
+
+        # Rewrite references across all glosses.
+        from .gloss import RELATIONSHIP_FIELDS  # local import to avoid cycle
+
+        for item in self.list_glosses():
+            changed = False
+            for field in RELATIONSHIP_FIELDS:
+                refs = getattr(item, field)
+                if not isinstance(refs, list):
+                    continue
+                if old_ref in refs:
+                    # avoid duplication if new_ref already present
+                    if new_ref not in refs:
+                        refs = [new_ref if ref == old_ref else ref for ref in refs]
+                    else:
+                        refs = [ref for ref in refs if ref != old_ref]
+                    setattr(item, field, refs)
+                    changed = True
+            if changed:
+                self.save_gloss(item)
+
+        return gloss
 
     def find_gloss_by_content(self, language: str, content: str) -> Gloss | None:
         language = normalize_language_code(language)
