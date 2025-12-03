@@ -17,6 +17,7 @@ class TranslationRequest:
     target_language: str
     provider: str
     model: str | None = None
+    context: str | None = None
 
 
 @dataclass
@@ -60,6 +61,8 @@ def _translate_openai(req: TranslationRequest, api_key: str, ai_note: str) -> Tr
     prompt = f"Translate the following gloss into {req.target_language}. Keep it concise.\n"
     if ai_note:
         prompt += f"Notes for this language: {ai_note}\n"
+    if req.context:
+        prompt += f"Additional context: {req.context}\n"
     prompt += f"Gloss: {req.gloss.content}"
     try:
         response = requests.post(

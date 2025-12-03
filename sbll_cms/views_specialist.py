@@ -67,6 +67,7 @@ def manage_situation(language: str, slug: str):
         native_language=native_language,
         flat_glosses=flat_glosses,
         languages=languages,
+        storage=storage,
     )
 
 

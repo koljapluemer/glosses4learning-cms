@@ -184,6 +184,7 @@ def translation_tool(language: str, slug: str):
     provider_model = request.form.get("provider_model", "OpenAI|gpt-4o-mini")
     provider, model = provider_model.split("|", 1)
     target_language = request.form.get("target_language")
+    context = request.form.get("context") or ""
     action = request.form.get("action") or "generate"
     translation_text = (request.form.get("translation") or "").strip()
 
@@ -222,7 +223,13 @@ def translation_tool(language: str, slug: str):
                 elif not _require_keys(provider, settings):
                     error = f"{provider} API key missing. Add it in Settings."
                 else:
-                    req = TranslationRequest(gloss=gloss, target_language=target_language, provider=provider, model=model)
+                    req = TranslationRequest(
+                        gloss=gloss,
+                        target_language=target_language,
+                        provider=provider,
+                        model=model,
+                        context=context,
+                    )
                     result = translate(req, settings, get_language_store())
                     if result.error:
                         error = result.error
@@ -240,4 +247,5 @@ def translation_tool(language: str, slug: str):
         message=message,
         target_language=target_language,
         provider_model=provider_model,
+        context=context,
     )

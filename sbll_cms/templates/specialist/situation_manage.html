@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
-{% set title = "Manage " ~ (situation.content or situation.slug) %}
+{% set title = "🖼" ~ (situation.content or situation.slug) %}
 {% block content %}
   <div class="mb-4 flex items-center justify-between">
     <div>
-      <h1 class="text-2xl font-bold">Manage {{ situation|paraphrase }}</h1>
+      <h1 class="text-2xl font-bold">Situation: <em>{{ situation|paraphrase }}</em></h1>
       <p class="text-sm text-base-content/70">{{ situation.language }}:{{ situation.slug }}</p>
     </div>
     <a class="btn btn-ghost btn-sm" href="{{ url_for('specialist.situation_list') }}">Back to list</a>
@@ -66,7 +66,11 @@
                       {% set filtered = (gloss.translations or []) | filter_translations(target_language) %}
                       {% if filtered %}
                         {% for ref in filtered %}
-                          <a class="link link-primary" target="_blank" href="{{ url_for('glosses.edit_gloss', language=ref.split(':')[0], slug=ref.split(':')[1]) }}">{{ ref }}</a>{% if not loop.last %}, {% endif %}
+                          {% set parts = ref.split(':') %}
+                          {% set t_lang = parts[0] %}
+                          {% set t_slug = parts[1] %}
+                          {% set t_gloss = storage.resolve_reference(ref) %}
+                          <a class="link link-primary" target="_blank" href="{{ url_for('glosses.edit_gloss', language=t_lang, slug=t_slug) }}">{{ t_gloss.content if t_gloss else ref }}</a>{% if not loop.last %}, {% endif %}
                         {% endfor %}
                       {% else %}
                         —

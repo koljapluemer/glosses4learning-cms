@@ -9,30 +9,36 @@
         <a class="btn btn-ghost btn-xs" href="{{ url_for('settings.settings') }}" target="_blank">Settings</a>
       </div>
     {% endif %}
-    <form hx-post="{{ url_for('htmx.translation_tool', language=gloss.language, slug=gloss.slug) }}"
-          hx-target="#translation-tool"
-          hx-swap="outerHTML"
-          class="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-      <label class="form-control">
-        <div class="label"><span class="label-text text-xs uppercase">Target language</span></div>
-        <select name="target_language" class="select select-bordered select-sm">
-          {% for lang in languages %}
-            {% if lang.iso_code != gloss.language %}
-              <option value="{{ lang.iso_code }}" {% if lang.iso_code == target_language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
-            {% endif %}
-          {% endfor %}
-        </select>
-      </label>
-      <label class="form-control">
-        <div class="label"><span class="label-text text-xs uppercase">Provider & Model</span></div>
-        <select name="provider_model" class="select select-bordered select-sm">
-          <option value="OpenAI|gpt-4o-mini" {% if provider_model == "OpenAI|gpt-4o-mini" %}selected{% endif %}>OpenAI | gpt-4o-mini</option>
-          <option value="OpenAI|gpt-4.1" {% if provider_model == "OpenAI|gpt-4.1" %}selected{% endif %}>OpenAI | gpt-4.1</option>
-          <option value="DeepL|general" {% if provider_model == "DeepL|general" %}selected{% endif %}>DeepL | general</option>
-        </select>
-      </label>
-      <button class="btn btn-primary btn-sm" type="submit">Generate</button>
-    </form>
+      <form hx-post="{{ url_for('htmx.translation_tool', language=gloss.language, slug=gloss.slug) }}"
+            hx-target="#translation-tool"
+            hx-swap="outerHTML"
+            class="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <label class="form-control">
+          <div class="label"><span class="label-text text-xs uppercase">Target language</span></div>
+          <select name="target_language" class="select select-bordered select-sm">
+            {% for lang in languages %}
+              {% if lang.iso_code != gloss.language %}
+                <option value="{{ lang.iso_code }}" {% if lang.iso_code == target_language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </label>
+        <label class="form-control">
+          <div class="label"><span class="label-text text-xs uppercase">Provider & Model</span></div>
+          <select name="provider_model" class="select select-bordered select-sm">
+            <option value="OpenAI|gpt-4o-mini" {% if provider_model == "OpenAI|gpt-4o-mini" %}selected{% endif %}>OpenAI | gpt-4o-mini</option>
+            <option value="OpenAI|gpt-4.1" {% if provider_model == "OpenAI|gpt-4.1" %}selected{% endif %}>OpenAI | gpt-4.1</option>
+            <option value="DeepL|general" {% if provider_model == "DeepL|general" %}selected{% endif %}>DeepL | general</option>
+          </select>
+        </label>
+        <button class="btn btn-primary btn-sm" type="submit">Generate</button>
+        <div class="md:col-span-3">
+          <label class="form-control">
+            <div class="label"><span class="label-text text-xs uppercase">Context (optional)</span></div>
+            <textarea name="context" class="textarea textarea-bordered textarea-sm" rows="2" placeholder="e.g., use polite form, noun not verb">{{ context or '' }}</textarea>
+          </label>
+        </div>
+      </form>
 
     {% if message %}
       <div class="alert alert-success py-2">{{ message }}</div>
