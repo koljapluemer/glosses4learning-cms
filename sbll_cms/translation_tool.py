@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,7 +22,7 @@ class TranslationRequest:
 
 @dataclass
 class TranslationResult:
-    translation: str | None
+    translations: list[str] | None
     error: str | None = None
     provider: str | None = None
     model: str | None = None
@@ -31,7 +31,6 @@ class TranslationResult:
 SUPPORTED_MODELS = [
     ("OpenAI", "gpt-4o-mini"),
     ("OpenAI", "gpt-4.1"),
-    ("DeepL", "general"),
 ]
 
 
@@ -44,26 +43,22 @@ def translate(req: TranslationRequest, settings: Settings, language_store: Langu
     if target_lang_obj and getattr(target_lang_obj, "ai_note", None):
         ai_note = target_lang_obj.ai_note
 
-    if provider == "OpenAI":
-        key = settings.api_keys.openai or os.getenv("OPENAI_API_KEY")
-        if not key:
-            return TranslationResult(translation=None, error="OpenAI API key not set.", provider=provider, model=model)
-        return _translate_openai(req, key, ai_note)
-    if provider == "DeepL":
-        key = settings.api_keys.deepl or os.getenv("DEEPL_API_KEY")
-        if not key:
-            return TranslationResult(translation=None, error="DeepL API key not set.", provider=provider, model=model)
-        return _translate_deepl(req, key, ai_note)
-    return TranslationResult(translation=None, error="Unsupported provider.", provider=provider, model=model)
+    key = settings.api_keys.openai
+    if not key:
+        return TranslationResult(translations=None, error="OpenAI API key not set.", provider=provider, model=model)
+    return _translate_openai(req, key, ai_note)
 
 
 def _translate_openai(req: TranslationRequest, api_key: str, ai_note: str) -> TranslationResult:
-    prompt = f"Translate the following gloss into {req.target_language}. Keep it concise.\n"
+    prompt = (
+        f"Translate the following gloss into {req.target_language}. "
+        "Return a JSON object with a 'translations' array of translation strings. Keep them concise."
+    )
     if ai_note:
-        prompt += f"Notes for this language: {ai_note}\n"
+        prompt += f" Notes for this language: {ai_note}"
     if req.context:
-        prompt += f"Additional context: {req.context}\n"
-    prompt += f"Gloss: {req.gloss.content}"
+        prompt += f" Additional context: {req.context}"
+    prompt += f" Gloss: {req.gloss.content}"
     try:
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -78,40 +73,55 @@ def _translate_openai(req: TranslationRequest, api_key: str, ai_note: str) -> Tr
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.2,
-                "max_tokens": 100,
+                "max_tokens": 200,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "translation_list",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "translations": {"type": "array", "items": {"type": "string"}}
+                            },
+                            "required": ["translations"],
+                            "additionalProperties": False,
+                        },
+                        "strict": True,
+                    },
+                },
             },
             timeout=30,
         )
         data = response.json()
         if response.status_code != 200:
-            return TranslationResult(translation=None, error=data.get("error", {}).get("message", "OpenAI error"), provider="OpenAI", model=req.model)
-        text = data["choices"][0]["message"]["content"].strip()
-        return TranslationResult(translation=text, provider="OpenAI", model=req.model)
+            return TranslationResult(translations=None, error=data.get("error", {}).get("message", "OpenAI error"), provider="OpenAI", model=req.model)
+        content = data["choices"][0]["message"]["content"].strip()
+        translations = []
+        try:
+            parsed = json.loads(content)
+            translations = _extract_translations(parsed)
+        except Exception:
+            translations = _extract_translations(content)
+        translations = [t for t in translations if t.strip()]
+        return TranslationResult(translations=translations, provider="OpenAI", model=req.model)
     except Exception as exc:  # noqa: BLE001
-        return TranslationResult(translation=None, error=str(exc), provider="OpenAI", model=req.model)
+        return TranslationResult(translations=None, error=str(exc), provider="OpenAI", model=req.model)
 
 
-def _translate_deepl(req: TranslationRequest, api_key: str, ai_note: str) -> TranslationResult:
-    prompt = req.gloss.content
-    if not req.target_language:
-        return TranslationResult(translation=None, error="Target language missing.", provider="DeepL", model="general")
-    target_lang = req.target_language.upper()
-    try:
-        response = requests.post(
-            "https://api-free.deepl.com/v2/translate",
-            data={
-                "text": prompt,
-                "target_lang": target_lang,
-                "formality": "default",
-            },
-            headers={"Authorization": f"DeepL-Auth-Key {api_key}"},
-            timeout=30,
-        )
-        data = response.json()
-        if response.status_code != 200:
-            message = data.get("message") or data.get("error", "DeepL error")
-            return TranslationResult(translation=None, error=message, provider="DeepL", model="general")
-        text = data["translations"][0]["text"]
-        return TranslationResult(translation=text, provider="DeepL", model="general")
-    except Exception as exc:  # noqa: BLE001
-        return TranslationResult(translation=None, error=str(exc), provider="DeepL", model="general")
+def _extract_translations(obj: Any) -> list[str]:
+    results: list[str] = []
+    if obj is None:
+        return results
+    if isinstance(obj, str):
+        return [obj]
+    if isinstance(obj, list):
+        for item in obj:
+            results.extend(_extract_translations(item))
+        return results
+    if isinstance(obj, dict):
+        if "translations" in obj and isinstance(obj["translations"], list):
+            results.extend(_extract_translations(obj["translations"]))
+        else:
+            for value in obj.values():
+                results.extend(_extract_translations(value))
+    return results

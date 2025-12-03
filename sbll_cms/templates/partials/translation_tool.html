@@ -28,7 +28,6 @@
           <select name="provider_model" class="select select-bordered select-sm">
             <option value="OpenAI|gpt-4o-mini" {% if provider_model == "OpenAI|gpt-4o-mini" %}selected{% endif %}>OpenAI | gpt-4o-mini</option>
             <option value="OpenAI|gpt-4.1" {% if provider_model == "OpenAI|gpt-4.1" %}selected{% endif %}>OpenAI | gpt-4.1</option>
-            <option value="DeepL|general" {% if provider_model == "DeepL|general" %}selected{% endif %}>DeepL | general</option>
           </select>
         </label>
         <button class="btn btn-primary btn-sm" type="submit">Generate</button>
@@ -52,13 +51,19 @@
             <p class="font-semibold">Generated</p>
           </div>
         </div>
-        <p>{{ result.translation }}</p>
+        {% if result.translations %}
+          <ul class="list-disc list-inside space-y-1">
+            {% for t in result.translations %}
+              <li>{{ t }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
         <div class="mt-3 flex gap-2">
           <form hx-post="{{ url_for('htmx.translation_tool', language=gloss.language, slug=gloss.slug) }}"
                 hx-target="#translation-tool"
                 hx-swap="outerHTML">
             <input type="hidden" name="action" value="accept">
-            <input type="hidden" name="translation" value="{{ result.translation }}">
+            <input type="hidden" name="translations_json" value='{{ result.translations | tojson }}'>
             <input type="hidden" name="target_language" value="{{ target_language }}">
             <input type="hidden" name="provider_model" value="{{ provider_model }}">
             <button class="btn btn-primary btn-sm" type="submit">Accept</button>
@@ -67,7 +72,7 @@
                 hx-target="#translation-tool"
                 hx-swap="outerHTML">
             <input type="hidden" name="action" value="keep">
-            <input type="hidden" name="translation" value="{{ result.translation }}">
+            <input type="hidden" name="translations_json" value='{{ result.translations | tojson }}'>
             <input type="hidden" name="target_language" value="{{ target_language }}">
             <input type="hidden" name="provider_model" value="{{ provider_model }}">
             <button class="btn btn-sm" type="submit">Keep (no link)</button>

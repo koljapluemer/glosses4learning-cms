@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from flask import Blueprint, abort, render_template, request
+import json
 
-from .gloss import RELATIONSHIP_FIELDS
+from .gloss import RELATIONSHIP_FIELDS, Gloss
 from .constants import WITHIN_LANGUAGE_RELATIONS, CROSS_LANGUAGE_RELATIONS
 from .language import get_language_store
 from .relations import attach_relation, detach_relation
@@ -166,11 +167,7 @@ def suggest_glosses():
 
 
 def _require_keys(provider: str, settings: Settings):
-    if provider == "OpenAI" and not (settings.api_keys.openai or current_app.config.get("OPENAI_API_KEY")):
-        return False
-    if provider == "DeepL" and not (settings.api_keys.deepl or current_app.config.get("DEEPL_API_KEY")):
-        return False
-    return True
+    return bool(settings.api_keys.openai)
 
 
 @bp.route("/glosses/<language>/<slug>/translation-tool", methods=["GET", "POST"])
@@ -186,7 +183,12 @@ def translation_tool(language: str, slug: str):
     target_language = request.form.get("target_language")
     context = request.form.get("context") or ""
     action = request.form.get("action") or "generate"
-    translation_text = (request.form.get("translation") or "").strip()
+    translations_json = request.form.get("translations_json") or ""
+    try:
+        translations_list = json.loads(translations_json) if translations_json else []
+    except Exception:
+        translations_list = []
+    translations_list = [t.strip() for t in translations_list if t and t.strip()]
 
     settings_store = current_app.extensions["settings_store"]
     settings = settings_store.load()
@@ -198,23 +200,29 @@ def translation_tool(language: str, slug: str):
     try:
         if request.method == "POST":
             if action in ("accept", "keep", "discard"):
-                if not translation_text:
+                if not translations_list:
                     error = "No translation text to process."
                 elif not target_language:
                     error = "Target language missing."
                 else:
                     if action == "accept":
-                        target = storage.ensure_gloss(target_language, translation_text)
                         from .relations import attach_relation
 
-                        attach_relation(storage, gloss, "translations", target)
+                        for t_text in translations_list:
+                            existing = storage.find_gloss_by_content(target_language, t_text)
+                            if existing:
+                                target = existing
+                            else:
+                                target = storage.create_gloss(Gloss(content=t_text, language=target_language, tags=["machine-translation"]))
+                            attach_relation(storage, gloss, "translations", target)
                         message = "Translation added."
                     elif action == "keep":
-                        storage.ensure_gloss(target_language, translation_text)
+                        for t_text in translations_list:
+                            storage.ensure_gloss(target_language, t_text)
                         message = "Translation saved as gloss."
                     elif action == "discard":
                         message = "Discarded."
-                    translation_text = ""
+                    translations_list = []
                     result = None
             else:
                 # generate
@@ -248,4 +256,5 @@ def translation_tool(language: str, slug: str):
         target_language=target_language,
         provider_model=provider_model,
         context=context,
+        translations_list=translations_list,
     )
