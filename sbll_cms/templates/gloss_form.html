@@ -128,7 +128,7 @@
       <a class="btn btn-ghost" href="{{ url_for('glosses.index') }}">Cancel</a>
       {% if gloss.slug %}
         <form action="{{ url_for('glosses.delete_gloss', language=gloss.language, slug=gloss.slug) }}" method="post" onsubmit="return confirm('Delete this gloss?');">
-          <button class="btn btn-error" type="submit">Delete gloss</button>
+          <button class="btn " type="submit">Delete gloss</button>
         </form>
       {% endif %}
     </div>

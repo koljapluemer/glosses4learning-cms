@@ -35,7 +35,7 @@
                 hx-post="{{ url_for('htmx.remove_relation', language=base.language, slug=base.slug, field=field) }}"
                 hx-target="#relation-{{ field }}" hx-swap="outerHTML">
                 <input type="hidden" name="target_ref" value="{{ row.ref }}" />
-                <button class="btn btn-error btn-xs" type="submit">Detach</button>
+                <button class="btn btn-xs" type="submit">Detach</button>
               </form>
             </td>
           </tr>
