@@ -54,3 +54,10 @@ def paraphrase_display(content: str | object, tags: list[str] | None = None) -> 
     if tag_list and PARAPHRASE_TAG in tag_list:
         return f"[{text}]"
     return str(text)
+
+
+def filter_translations(translations: list[str] | None, target_language: str | None) -> list[str]:
+    if not translations or not target_language:
+        return []
+    target_language = target_language.strip().lower()
+    return [ref for ref in translations if ref.lower().startswith(f"{target_language}:")]

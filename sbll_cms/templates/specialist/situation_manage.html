@@ -10,6 +10,28 @@
 
   <div class="card bg-base-100 shadow-md">
     <div class="card-body">
+      <form class="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end mb-4" method="get">
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text text-xs uppercase">Native Language</span></div>
+          <select name="native_language" class="select select-bordered select-sm">
+            <option value="">No filter</option>
+            {% for lang in languages %}
+              <option value="{{ lang.iso_code }}" {% if lang.iso_code == native_language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="form-control w-full">
+          <div class="label"><span class="label-text text-xs uppercase">Target Language</span></div>
+          <select name="target_language" class="select select-bordered select-sm">
+            <option value="">No filter</option>
+            {% for lang in languages %}
+              <option value="{{ lang.iso_code }}" {% if lang.iso_code == target_language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="btn btn-sm btn-primary mt-1" type="submit">Apply</button>
+      </form>
+
       {% if tree_lines %}
         <pre class="font-mono text-sm whitespace-pre-wrap leading-tight">{{ tree_lines|join('\n')|safe }}</pre>
       {% else %}
@@ -19,4 +41,45 @@
       {% endif %}
     </div>
   </div>
+
+  {% if target_language %}
+    <div class="mt-4 card bg-base-100 shadow-md">
+      <div class="card-body">
+        <h2 class="card-title text-lg">Translations into {{ target_language }}</h2>
+        {% if flat_glosses %}
+          <div class="overflow-x-auto">
+            <table class="table table-xs">
+              <thead>
+                <tr>
+                  <th>Gloss</th>
+                  <th>Translations</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for gloss in flat_glosses %}
+                  <tr>
+                    <td>
+                      <a class="link link-primary" target="_blank" href="{{ url_for('glosses.edit_gloss', language=gloss.language, slug=gloss.slug) }}">{{ gloss|paraphrase }}</a>
+                    </td>
+                    <td>
+                      {% set filtered = (gloss.translations or []) | filter_translations(target_language) %}
+                      {% if filtered %}
+                        {% for ref in filtered %}
+                          <a class="link link-primary" target="_blank" href="{{ url_for('glosses.edit_gloss', language=ref.split(':')[0], slug=ref.split(':')[1]) }}">{{ ref }}</a>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert"><span>No glosses found in the tree.</span></div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
 {% endblock %}

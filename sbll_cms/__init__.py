@@ -10,7 +10,7 @@ from .views_htmx import bp as htmx_bp
 from .views_settings import bp as settings_bp
 from .views_specialist import bp as specialist_bp
 from .settings import SettingsStore
-from .utils import paraphrase_display
+from .utils import paraphrase_display, filter_translations
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
@@ -25,6 +25,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     app.extensions["settings_store"] = settings_store
 
     app.jinja_env.filters["paraphrase"] = paraphrase_display
+    app.jinja_env.filters["filter_translations"] = filter_translations
 
     app.register_blueprint(glosses_bp)
     app.register_blueprint(htmx_bp, url_prefix="/htmx")
