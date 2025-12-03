@@ -9,7 +9,7 @@
                 hx-target="#{{ target_id }}"
                 hx-swap="outerHTML">
             <div>
-              <p class="font-semibold">{{ gloss.content }}</p>
+              <p class="font-semibold">{{ gloss|paraphrase }}</p>
               <p class="text-xs text-base-content/70 font-mono">{{ gloss.language }}:{{ gloss.slug }}</p>
             </div>
             <div class="flex gap-2 items-center">

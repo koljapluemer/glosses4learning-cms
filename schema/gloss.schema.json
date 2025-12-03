@@ -63,7 +63,8 @@
     "children": {
       "type": "array",
       "items": { "$ref": "#/$defs/GlossRef" },
-      "default": []
+      "default": [],
+      "description": "Didactic children; may reference glosses in any language."
     },
     "translations": {
       "type": "array",

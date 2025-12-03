@@ -32,12 +32,14 @@ def _relation_rows(base, field):
         else:
             iso, slug = base.language, ref
         related = storage.resolve_reference(ref)
+        tags = related.tags if related else []
         rows.append(
             {
                 "ref": ref,
                 "iso": iso,
                 "slug": slug,
                 "title": related.content if related else slug,
+                "tags": tags,
             }
         )
     return rows
@@ -70,7 +72,12 @@ def add_relation(language: str, slug: str, field: str):
     storage = get_storage()
 
     target_ref = request.form.get("target_ref") or ""
-    target_iso = normalize_language_code(request.form.get("target_iso") or base.language if field in WITHIN_LANGUAGE_RELATIONS else None)
+    target_iso_raw = request.form.get("target_iso") or (base.language if field in WITHIN_LANGUAGE_RELATIONS else None)
+    try:
+        target_iso = normalize_language_code(target_iso_raw)
+    except ValueError as exc:
+        error = str(exc)
+        target_iso = None
     target_content = (request.form.get("target_content") or "").strip()
 
     error = None

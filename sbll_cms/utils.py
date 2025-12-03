@@ -5,6 +5,7 @@ import sanitize_filename
 
 
 LANGUAGE_PATTERN = re.compile(r"^[a-z]{3}$")
+PARAPHRASE_TAG = "eng:paraphrase"
 
 
 def derive_slug(content: str) -> str:
@@ -16,12 +17,12 @@ def derive_slug(content: str) -> str:
 
 
 def normalize_language_code(language: str | None) -> str:
-    """Ensure a 3-letter ISO code is always present; default to 'und'."""
+    """Ensure a 3-letter ISO code is always present; raise if missing/invalid."""
     if not language:
-        return "und"
+        raise ValueError("Language code is required.")
     language = language.strip().lower()
     if not LANGUAGE_PATTERN.match(language):
-        return "und"
+        raise ValueError("Language code must be a 3-letter ISO 639-3 string.")
     return language
 
 
@@ -41,3 +42,15 @@ def parse_key_value_lines(value: str) -> dict[str, str]:
         else:
             result[line.strip()] = ""
     return result
+
+
+def paraphrase_display(content: str | object, tags: list[str] | None = None) -> str:
+    """Wrap content in brackets when a paraphrase tag is present."""
+    tag_list = tags
+    text = content
+    if hasattr(content, "content"):
+        text = getattr(content, "content")
+        tag_list = tags or getattr(content, "tags", [])
+    if tag_list and PARAPHRASE_TAG in tag_list:
+        return f"[{text}]"
+    return str(text)

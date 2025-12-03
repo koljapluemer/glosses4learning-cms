@@ -38,6 +38,10 @@ def _validate_gloss(gloss: Gloss) -> list[str]:
     slug = derive_slug(gloss.content)
     if not slug:
         errors.append("Content must include characters that produce a valid filename.")
+    try:
+        normalize_language_code(gloss.language)
+    except ValueError as exc:
+        errors.append(str(exc))
     return errors
 
 

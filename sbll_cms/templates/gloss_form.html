@@ -15,13 +15,13 @@
               <span class="label-text font-semibold">Language (ISO 639-3)</span>
             </div>
             {% if languages %}
-              <select name="language" class="select select-bordered" {% if mode == 'create' %}data-remember-language="true"{% endif %}>
+              <select name="language" class="select select-bordered" required {% if mode == 'create' %}data-remember-language="true"{% endif %}>
                 {% for lang in languages %}
                   <option value="{{ lang.iso_code }}" {% if lang.iso_code == gloss.language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
                 {% endfor %}
               </select>
             {% else %}
-              <input type="text" name="language" value="{{ gloss.language or '' }}" class="input input-bordered" maxlength="3" placeholder="eng" />
+              <input type="text" name="language" value="{{ gloss.language or '' }}" class="input input-bordered" maxlength="3" placeholder="eng" required />
             {% endif %}
           </label>
           <label class="form-control">

@@ -19,7 +19,7 @@
         <tbody>
           {% for row in rows %}
           <tr>
-            <td class="font-semibold">{{ row.title }}</td>
+            <td class="font-semibold">{{ row.title|paraphrase(row.tags) }}</td>
             <td class="text-right space-x-2">
               <a class="btn btn-xs" target="_blank"
                 href="{{ url_for('glosses.edit_gloss', language=row.iso, slug=row.slug) }}">Open</a>

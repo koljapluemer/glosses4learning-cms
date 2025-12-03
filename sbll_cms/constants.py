@@ -7,13 +7,13 @@ WITHIN_LANGUAGE_RELATIONS = {
     "to_be_differentiated_from",
     "collocations",
     "typical_follow_up",
-    "children",
 }
 
 CROSS_LANGUAGE_RELATIONS = {
     "translations",
     "notes",
     "tags",
+    "children",
 }
 
 SYMMETRICAL_RELATIONS = {

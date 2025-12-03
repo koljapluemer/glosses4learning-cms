@@ -28,7 +28,7 @@
                 <tbody>
                   {% for gloss in glosses %}
                     <tr>
-                      <td class="whitespace-normal break-words">{{ gloss.content }}</td>
+                      <td class="whitespace-normal break-words">{{ gloss|paraphrase }}</td>
                       <td class="text-right space-x-1">
                         <a class="btn btn-xs" href="{{ url_for('glosses.edit_gloss', language=gloss.language, slug=gloss.slug) }}">Edit</a>
                         <form action="{{ url_for('glosses.delete_gloss', language=gloss.language, slug=gloss.slug) }}" method="post" class="inline" onsubmit="return confirm('Delete this gloss?');">
