@@ -16,18 +16,10 @@
 
     <div class="overflow-x-auto">
       <table class="table table-zebra">
-        <thead>
-          <tr>
-            <th>Content</th>
-            <th>Reference</th>
-            <th class="text-right">Actions</th>
-          </tr>
-        </thead>
         <tbody>
           {% for row in rows %}
           <tr>
             <td class="font-semibold">{{ row.title }}</td>
-            <td class="font-mono text-sm">{{ row.ref }}</td>
             <td class="text-right space-x-2">
               <a class="btn btn-xs" target="_blank"
                 href="{{ url_for('glosses.edit_gloss', language=row.iso, slug=row.slug) }}">Open</a>
@@ -40,7 +32,7 @@
             </td>
           </tr>
           {% endfor %}
-          <tr class="bg-base-200">
+          <tr>
             <td colspan="3">
               <form class="grid md:grid-cols-[150px_1fr_auto] gap-2 items-center"
                 hx-post="{{ url_for('htmx.add_relation', language=base.language, slug=base.slug, field=field) }}"
