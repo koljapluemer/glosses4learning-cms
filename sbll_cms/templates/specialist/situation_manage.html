@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+{% block content %}
+  <div class="mb-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Manage {{ situation|paraphrase }}</h1>
+      <p class="text-sm text-base-content/70">{{ situation.language }}:{{ situation.slug }}</p>
+    </div>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('specialist.situation_list') }}">Back to list</a>
+  </div>
+
+  <div class="card bg-base-100 shadow-md">
+    <div class="card-body">
+      {% if tree_lines %}
+        <pre class="font-mono text-sm whitespace-pre-wrap leading-tight">{{ tree_lines|join('\n')|safe }}</pre>
+      {% else %}
+        <div class="alert">
+          <span>No goals or parts found for this situation.</span>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

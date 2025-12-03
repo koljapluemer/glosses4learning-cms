@@ -8,6 +8,7 @@ from .storage import GlossStorage
 from .views import bp as glosses_bp
 from .views_htmx import bp as htmx_bp
 from .views_settings import bp as settings_bp
+from .views_specialist import bp as specialist_bp
 from .settings import SettingsStore
 from .utils import paraphrase_display
 
@@ -28,6 +29,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     app.register_blueprint(glosses_bp)
     app.register_blueprint(htmx_bp, url_prefix="/htmx")
     app.register_blueprint(settings_bp, url_prefix="/settings")
+    app.register_blueprint(specialist_bp, url_prefix="/specialist")
     return app
 
 
