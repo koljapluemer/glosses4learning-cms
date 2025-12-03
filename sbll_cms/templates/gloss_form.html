@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% set title = (gloss.content if gloss and gloss.slug else 'New Gloss') ~ " – Gloss" %}
 {% block content %}
   <form class="space-y-4" action="{% if mode == 'create' %}{{ url_for('glosses.create_gloss') }}{% else %}{{ url_for('glosses.update_gloss', language=gloss.language, slug=gloss.slug) }}{% endif %}" method="post">
     <div class="sticky top-0 z-20 bg-base-100/90 backdrop-blur shadow-sm border border-base-200 rounded-lg mb-4">
