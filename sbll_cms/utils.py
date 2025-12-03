@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import re
+import sanitize_filename
 
 
-INVALID_FILENAME_CHARS = r'[<>:"/\\\\|?*\x00-\x1F]'
-INVALID_TRAILING = re.compile(r"[\\.\\s]+$")
 LANGUAGE_PATTERN = re.compile(r"^[a-z]{3}$")
 
 
 def derive_slug(content: str) -> str:
     """Create a slug by removing characters that are illegal in filenames."""
-    slug = re.sub(INVALID_FILENAME_CHARS, "", content)
-    slug = INVALID_TRAILING.sub("", slug.strip())
-    return slug[:150]
+    safe = sanitize_filename.sanitize(content).strip()
+    # Limit to 255 bytes to stay filesystem-friendly.
+    encoded = safe.encode("utf-8")[:255]
+    return encoded.decode("utf-8", "ignore")
 
 
 def normalize_language_code(language: str | None) -> str:
