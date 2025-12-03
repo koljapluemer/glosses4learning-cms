@@ -28,3 +28,16 @@ def normalize_language_code(language: str | None) -> str:
 def split_text_area(value: str) -> list[str]:
     parts = [segment.strip() for segment in re.split(r"[\\r\\n,]+", value or "") if segment.strip()]
     return parts
+
+
+def parse_key_value_lines(value: str) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for line in (value or "").splitlines():
+        if not line.strip():
+            continue
+        if ":" in line:
+            key, val = line.split(":", 1)
+            result[key.strip()] = val.strip()
+        else:
+            result[line.strip()] = ""
+    return result

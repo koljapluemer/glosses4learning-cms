@@ -15,31 +15,32 @@
       "default": "und"
     },
     "transcriptions": {
-      "type": "array",
-      "items": { "type": "string" },
-      "default": []
+      "type": "object",
+      "description": "Map of transcription types to their values.",
+      "additionalProperties": { "type": "string" },
+      "default": {}
     },
-    "contains": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/GlossRef" },
-      "default": []
-    },
-    "near_synonyms": {
+    "morphologically_related": {
       "type": "array",
       "items": { "$ref": "#/$defs/GlossRef" },
       "default": []
     },
-    "near_homophones": {
+    "parts": {
       "type": "array",
       "items": { "$ref": "#/$defs/GlossRef" },
       "default": []
     },
-    "translations": {
+    "has_similar_meaning": {
       "type": "array",
       "items": { "$ref": "#/$defs/GlossRef" },
       "default": []
     },
-    "clarifies_usage": {
+    "sounds_similar": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "usage_examples": {
       "type": "array",
       "items": { "$ref": "#/$defs/GlossRef" },
       "default": []
@@ -50,6 +51,31 @@
       "default": []
     },
     "collocations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "typical_follow_up": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "children": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "translations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "notes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "tags": {
       "type": "array",
       "items": { "$ref": "#/$defs/GlossRef" },
       "default": []
@@ -68,8 +94,10 @@
     {
       "content": "bonjour",
       "language": "fra",
-      "transcriptions": ["bɔ̃.ʒuʁ"],
-      "translations": ["eng:hello"]
+      "transcriptions": { "IPA": "bɔ̃.ʒuʁ" },
+      "translations": ["eng:hello"],
+      "has_similar_meaning": ["fra:slt"],
+      "tags": ["fra:greeting"]
     }
   ]
 }

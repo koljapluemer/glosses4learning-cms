@@ -23,7 +23,6 @@
             </div>
             {% if languages %}
               <select name="language" class="select select-bordered" {% if mode == 'create' %}data-remember-language="true"{% endif %}>
-                <option value="">und</option>
                 {% for lang in languages %}
                   <option value="{{ lang.iso_code }}" {% if lang.iso_code == gloss.language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
                 {% endfor %}
@@ -35,9 +34,9 @@
           <label class="form-control">
             <div class="label">
               <span class="label-text font-semibold">Transcriptions</span>
-              <span class="label-text-alt">one per line</span>
+              <span class="label-text-alt">key: value per line</span>
             </div>
-            <textarea name="transcriptions" class="textarea textarea-bordered" rows="2">{% if gloss.transcriptions %}{{ gloss.transcriptions | join('\n') }}{% endif %}</textarea>
+            <textarea name="transcriptions" class="textarea textarea-bordered" rows="3">{% if gloss.transcriptions %}{% for k, v in gloss.transcriptions.items() %}{{ k }}: {{ v }}{% if not loop.last %}\n{% endif %}{% endfor %}{% endif %}</textarea>
           </label>
         </div>
       </div>

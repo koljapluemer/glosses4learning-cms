@@ -8,7 +8,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from .gloss import Gloss, RELATIONSHIP_FIELDS
 from .language import get_language_store
 from .storage import get_storage
-from .utils import derive_slug, normalize_language_code, split_text_area
+from .utils import derive_slug, normalize_language_code, split_text_area, parse_key_value_lines
 
 bp = Blueprint("glosses", __name__)
 
@@ -16,7 +16,7 @@ bp = Blueprint("glosses", __name__)
 def _gloss_from_form() -> Gloss:
     content = (request.form.get("content") or "").strip()
     language = normalize_language_code(request.form.get("language"))
-    transcriptions = split_text_area(request.form.get("transcriptions"))
+    transcriptions = parse_key_value_lines(request.form.get("transcriptions"))
 
     relationship_values = {
         field: split_text_area(request.form.get(field))

@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, render_template, request
 
 from .gloss import RELATIONSHIP_FIELDS
+from .constants import WITHIN_LANGUAGE_RELATIONS, CROSS_LANGUAGE_RELATIONS
 from .language import get_language_store
 from .relations import attach_relation, detach_relation
 from .storage import get_storage
@@ -52,6 +53,7 @@ def relation_table(language: str, slug: str, field: str):
         field=field,
         rows=rows,
         languages=languages,
+        allow_language_select=field in CROSS_LANGUAGE_RELATIONS,
         message=None,
         error=None,
     )
@@ -65,7 +67,7 @@ def add_relation(language: str, slug: str, field: str):
     storage = get_storage()
 
     target_ref = request.form.get("target_ref") or ""
-    target_iso = normalize_language_code(request.form.get("target_iso"))
+    target_iso = normalize_language_code(request.form.get("target_iso") or base.language if field in WITHIN_LANGUAGE_RELATIONS else None)
     target_content = (request.form.get("target_content") or "").strip()
 
     error = None
@@ -98,6 +100,7 @@ def add_relation(language: str, slug: str, field: str):
         field=field,
         rows=rows,
         languages=languages,
+        allow_language_select=field in CROSS_LANGUAGE_RELATIONS,
         message=message,
         error=error,
     )
@@ -120,6 +123,7 @@ def remove_relation(language: str, slug: str, field: str):
         field=field,
         rows=rows,
         languages=languages,
+        allow_language_select=field in CROSS_LANGUAGE_RELATIONS,
         message="Relation removed.",
         error=None,
     )
@@ -134,6 +138,8 @@ def suggest_glosses():
     base_slug = request.args.get("base_slug")
     if not field or not base_language or not base_slug:
         abort(400)
+    if field in WITHIN_LANGUAGE_RELATIONS:
+        language_filter = base_language
 
     storage = get_storage()
     results = storage.search_glosses(query, language_filter)

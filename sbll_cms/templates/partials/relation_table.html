@@ -3,16 +3,15 @@
     <div class="flex items-center justify-between">
       <div>
         <h3 class="card-title">{{ field.replace('_', ' ').title() }}</h3>
-        <p class="text-sm text-base-content/70">References as $iso:$slug</p>
       </div>
       <span class="badge badge-neutral">{{ rows|length }} linked</span>
     </div>
 
     {% if message %}
-      <div class="alert alert-success py-2">{{ message }}</div>
+    <div class="alert alert-success py-2">{{ message }}</div>
     {% endif %}
     {% if error %}
-      <div class="alert alert-error py-2">{{ error }}</div>
+    <div class="alert alert-error py-2">{{ error }}</div>
     {% endif %}
 
     <div class="overflow-x-auto">
@@ -26,50 +25,41 @@
         </thead>
         <tbody>
           {% for row in rows %}
-            <tr>
-              <td class="font-semibold">{{ row.title }}</td>
-              <td class="font-mono text-sm">{{ row.ref }}</td>
-              <td class="text-right space-x-2">
-                <a class="btn btn-xs" target="_blank" href="{{ url_for('glosses.edit_gloss', language=row.iso, slug=row.slug) }}">Open</a>
-                <form class="inline"
-                      hx-post="{{ url_for('htmx.remove_relation', language=base.language, slug=base.slug, field=field) }}"
-                      hx-target="#relation-{{ field }}"
-                      hx-swap="outerHTML">
-                  <input type="hidden" name="target_ref" value="{{ row.ref }}" />
-                  <button class="btn btn-error btn-xs" type="submit">Detach</button>
-                </form>
-              </td>
-            </tr>
+          <tr>
+            <td class="font-semibold">{{ row.title }}</td>
+            <td class="font-mono text-sm">{{ row.ref }}</td>
+            <td class="text-right space-x-2">
+              <a class="btn btn-xs" target="_blank"
+                href="{{ url_for('glosses.edit_gloss', language=row.iso, slug=row.slug) }}">Open</a>
+              <form class="inline"
+                hx-post="{{ url_for('htmx.remove_relation', language=base.language, slug=base.slug, field=field) }}"
+                hx-target="#relation-{{ field }}" hx-swap="outerHTML">
+                <input type="hidden" name="target_ref" value="{{ row.ref }}" />
+                <button class="btn btn-error btn-xs" type="submit">Detach</button>
+              </form>
+            </td>
+          </tr>
           {% endfor %}
           <tr class="bg-base-200">
             <td colspan="3">
               <form class="grid md:grid-cols-[150px_1fr_auto] gap-2 items-center"
-                    hx-post="{{ url_for('htmx.add_relation', language=base.language, slug=base.slug, field=field) }}"
-                    hx-target="#relation-{{ field }}"
-                    hx-swap="outerHTML">
-                <label class="form-control">
-                  <div class="label"><span class="label-text text-xs uppercase">Language</span></div>
-                  <select name="target_iso" class="select select-bordered select-sm" data-remember-relation-language="true">
-                    <option value="">und</option>
-                    {% for lang in languages %}
-                      <option value="{{ lang.iso_code }}" {% if lang.iso_code == base.language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="form-control">
-                  <div class="label flex justify-between">
-                    <span class="label-text text-xs uppercase">Content</span>
-                    <span class="label-text-alt text-xs">Start typing to search</span>
-                  </div>
-                  <input name="target_content"
-                         class="input input-bordered input-sm"
-                         placeholder="Content to link"
-                         hx-get="{{ url_for('htmx.suggest_glosses') }}?field={{ field }}&base_language={{ base.language }}&base_slug={{ base.slug }}"
-                         hx-trigger="keyup changed delay:250ms"
-                         hx-target="#suggestions-{{ field }}"
-                         hx-include="closest form"
-                         autocomplete="off" />
-                </label>
+                hx-post="{{ url_for('htmx.add_relation', language=base.language, slug=base.slug, field=field) }}"
+                hx-target="#relation-{{ field }}" hx-swap="outerHTML">
+                {% if allow_language_select %}
+                <select name="target_iso" class="select select-bordered select-sm"
+                  data-remember-relation-language="true">
+                  {% for lang in languages %}
+                  <option value="{{ lang.iso_code }}" {% if lang.iso_code==base.language %}selected{% endif %}>{{
+                    lang.symbol }} — {{ lang.display_name }}</option>
+                  {% endfor %}
+                </select>
+                {% else %}
+                <input type="hidden" name="target_iso" value="{{ base.language }}">
+                {% endif %}
+                <input name="target_content" class="input input-bordered input-sm w-full" placeholder="Content to link"
+                  hx-get="{{ url_for('htmx.suggest_glosses') }}?field={{ field }}&base_language={{ base.language }}&base_slug={{ base.slug }}"
+                  hx-trigger="keyup changed delay:250ms" hx-target="#suggestions-{{ field }}" hx-include="closest form"
+                  autocomplete="off" />
                 <div class="flex justify-end">
                   <button class="btn btn-primary btn-sm" type="submit">Add</button>
                 </div>
