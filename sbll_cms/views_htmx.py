@@ -128,7 +128,7 @@ def remove_relation(language: str, slug: str, field: str):
 @bp.get("/glosses/suggest")
 def suggest_glosses():
     query = request.args.get("q", "") or request.args.get("target_content", "")
-    language_filter = request.args.get("language")
+    language_filter = request.args.get("target_iso") or request.args.get("language")
     field = request.args.get("field")
     base_language = request.args.get("base_language")
     base_slug = request.args.get("base_slug")

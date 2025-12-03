@@ -67,7 +67,7 @@
                          hx-get="{{ url_for('htmx.suggest_glosses') }}?field={{ field }}&base_language={{ base.language }}&base_slug={{ base.slug }}"
                          hx-trigger="keyup changed delay:250ms"
                          hx-target="#suggestions-{{ field }}"
-                         hx-params="*"
+                         hx-include="closest form"
                          autocomplete="off" />
                 </label>
                 <div class="flex justify-end">
@@ -83,3 +83,19 @@
     <div id="suggestions-{{ field }}" class="w-full"></div>
   </div>
 </div>
+
+<script>
+  (() => {
+    const root = document.currentScript.closest('#relation-{{ field }}');
+    if (!root) return;
+    const input = root.querySelector('input[name="target_content"]');
+    if (input) {
+      const indicator = document.createElement('div');
+      indicator.className = "loading loading-spinner loading-xs ml-2 hidden";
+      input.parentElement.appendChild(indicator);
+      input.addEventListener("htmx:beforeRequest", () => indicator.classList.remove("hidden"));
+      input.addEventListener("htmx:afterSwap", () => indicator.classList.add("hidden"));
+      input.addEventListener("htmx:responseError", () => indicator.classList.add("hidden"));
+    }
+  })();
+</script>
