@@ -12,6 +12,7 @@ class Language:
     iso_code: str
     display_name: str
     symbol: str
+    ai_note: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "Language":
@@ -19,6 +20,7 @@ class Language:
             iso_code=data.get("isoCode", "").strip().lower(),
             display_name=data.get("displayName", "").strip(),
             symbol=data.get("symbol", "").strip(),
+            ai_note=data.get("ai_note") or data.get("aiNote"),
         )
 
 

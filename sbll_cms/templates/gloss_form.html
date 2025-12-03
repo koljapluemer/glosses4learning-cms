@@ -57,6 +57,18 @@
             </div>
           </div>
         {% endfor %}
+        <div id="translation-tool"
+             hx-get="{{ url_for('htmx.translation_tool', language=gloss.language, slug=gloss.slug) }}"
+             hx-trigger="load"
+             hx-target="this"
+             hx-swap="outerHTML">
+          <div class="card bg-base-100 shadow-md">
+            <div class="card-body">
+              <div class="skeleton h-6 w-32 mb-2"></div>
+              <div class="skeleton h-4 w-full"></div>
+            </div>
+          </div>
+        </div>
       </div>
     {% else %}
       <div class="alert">

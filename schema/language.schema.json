@@ -16,6 +16,10 @@
     "symbol": {
       "type": "string",
       "description": "Short symbol or abbreviation for UI display."
+    },
+    "ai_note": {
+      "type": "string",
+      "description": "Optional hint for LLMs when translating into this language."
     }
   },
   "required": ["isoCode", "displayName", "symbol"],

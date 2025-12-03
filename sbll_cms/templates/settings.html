@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block content %}
+  <div class="mb-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Settings</h1>
+      <p class="text-sm text-base-content/70">API keys are stored locally in data/settings.json.</p>
+    </div>
+  </div>
+  <form method="post" class="card bg-base-100 shadow-md">
+    <div class="card-body space-y-3">
+      <label class="form-control">
+        <div class="label"><span class="label-text font-semibold">OpenAI API Key</span></div>
+        <input type="password" name="openai" class="input input-bordered" value="{{ settings.api_keys.openai or '' }}" placeholder="sk-..." autocomplete="off" />
+      </label>
+      <label class="form-control">
+        <div class="label"><span class="label-text font-semibold">DeepL API Key</span></div>
+        <input type="password" name="deepl" class="input input-bordered" value="{{ settings.api_keys.deepl or '' }}" placeholder="deepl-key" autocomplete="off" />
+      </label>
+      <div class="card-actions justify-end">
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </div>
+  </form>
+{% endblock %}

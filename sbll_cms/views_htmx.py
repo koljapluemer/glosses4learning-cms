@@ -7,6 +7,9 @@ from .constants import WITHIN_LANGUAGE_RELATIONS, CROSS_LANGUAGE_RELATIONS
 from .language import get_language_store
 from .relations import attach_relation, detach_relation
 from .storage import get_storage
+from .translation_tool import TranslationRequest, translate
+from .settings import Settings
+from flask import current_app
 from .utils import normalize_language_code
 
 bp = Blueprint("htmx", __name__)
@@ -152,4 +155,82 @@ def suggest_glosses():
         results=results,
         action_url=action_url,
         target_id=target_id,
+    )
+
+
+def _require_keys(provider: str, settings: Settings):
+    if provider == "OpenAI" and not (settings.api_keys.openai or current_app.config.get("OPENAI_API_KEY")):
+        return False
+    if provider == "DeepL" and not (settings.api_keys.deepl or current_app.config.get("DEEPL_API_KEY")):
+        return False
+    return True
+
+
+@bp.route("/glosses/<language>/<slug>/translation-tool", methods=["GET", "POST"])
+def translation_tool(language: str, slug: str):
+    storage = get_storage()
+    gloss = storage.load_gloss(language, slug)
+    if not gloss:
+        abort(404)
+    languages = get_language_store().list_languages()
+
+    provider_model = request.form.get("provider_model", "OpenAI|gpt-4o-mini")
+    provider, model = provider_model.split("|", 1)
+    target_language = request.form.get("target_language")
+    action = request.form.get("action") or "generate"
+    translation_text = (request.form.get("translation") or "").strip()
+
+    settings_store = current_app.extensions["settings_store"]
+    settings = settings_store.load()
+
+    error = None
+    message = None
+    result = None
+
+    try:
+        if request.method == "POST":
+            if action in ("accept", "keep", "discard"):
+                if not translation_text:
+                    error = "No translation text to process."
+                elif not target_language:
+                    error = "Target language missing."
+                else:
+                    if action == "accept":
+                        target = storage.ensure_gloss(target_language, translation_text)
+                        from .relations import attach_relation
+
+                        attach_relation(storage, gloss, "translations", target)
+                        message = "Translation added."
+                    elif action == "keep":
+                        storage.ensure_gloss(target_language, translation_text)
+                        message = "Translation saved as gloss."
+                    elif action == "discard":
+                        message = "Discarded."
+                    translation_text = ""
+                    result = None
+            else:
+                # generate
+                if not target_language:
+                    error = "Select a target language."
+                elif not _require_keys(provider, settings):
+                    error = f"{provider} API key missing. Add it in Settings."
+                else:
+                    req = TranslationRequest(gloss=gloss, target_language=target_language, provider=provider, model=model)
+                    result = translate(req, settings, get_language_store())
+                    if result.error:
+                        error = result.error
+                        result = None
+    except Exception as exc:  # noqa: BLE001
+        error = str(exc)
+        result = None
+
+    return render_template(
+        "partials/translation_tool.html",
+        gloss=storage.load_gloss(gloss.language, gloss.slug) or gloss,
+        languages=languages,
+        result=result,
+        error=error,
+        message=message,
+        target_language=target_language,
+        provider_model=provider_model,
     )
