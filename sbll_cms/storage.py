@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from flask import current_app
 
@@ -67,6 +67,13 @@ class GlossStorage:
         gloss.language = language
         return gloss
 
+    def save_gloss(self, gloss: Gloss) -> Gloss:
+        if not gloss.slug or not gloss.language:
+            raise ValueError("Gloss must have language and slug before saving.")
+        target = self._path_for(gloss.language, gloss.slug)
+        self._write_gloss(target, gloss)
+        return gloss
+
     def update_gloss(self, original_language: str, original_slug: str, gloss: Gloss) -> Gloss:
         language = normalize_language_code(gloss.language)
         slug = derive_slug(gloss.content)
@@ -98,6 +105,46 @@ class GlossStorage:
         payload = gloss.to_dict()
         with path.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, ensure_ascii=False)
+
+    def find_gloss_by_content(self, language: str, content: str) -> Gloss | None:
+        language = normalize_language_code(language)
+        slug = derive_slug(content)
+        if not slug:
+            return None
+        return self.load_gloss(language, slug)
+
+    def ensure_gloss(self, language: str, content: str) -> Gloss:
+        existing = self.find_gloss_by_content(language, content)
+        if existing:
+            return existing
+        new_gloss = Gloss(content=content, language=language)
+        return self.create_gloss(new_gloss)
+
+    def resolve_reference(self, ref: str) -> Gloss | None:
+        if ":" not in ref:
+            return None
+        language, slug = ref.split(":", 1)
+        language = normalize_language_code(language)
+        slug = slug.strip()
+        if not slug:
+            return None
+        return self.load_gloss(language, slug)
+
+    def search_glosses(self, query: str, language: str | None = None, limit: int = 10) -> list[Gloss]:
+        query = (query or "").strip().lower()
+        language = normalize_language_code(language or "")
+        if not query:
+            return []
+
+        results: list[Gloss] = []
+        for gloss in self.list_glosses():
+            if language and gloss.language != language:
+                continue
+            if query in gloss.content.lower() or query in (gloss.slug or "").lower():
+                results.append(gloss)
+            if len(results) >= limit:
+                break
+        return results
 
 
 def get_storage() -> GlossStorage:
