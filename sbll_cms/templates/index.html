@@ -17,21 +17,28 @@
               <h2 class="card-title uppercase">{{ language }}</h2>
               <span class="badge badge-neutral">{{ glosses|length }} item{{ 's' if glosses|length != 1 else '' }}</span>
             </div>
-            <div class="grid md:grid-cols-2 gap-3">
-              {% for gloss in glosses %}
-                <div class="card bg-base-200">
-                  <div class="card-body">
-                    <h3 class="font-semibold mb-1">{{ gloss.content }}</h3>
-                    <p class="text-xs text-base-content/70 break-all">{{ gloss.language }}:{{ gloss.slug or gloss.content }}</p>
-                    <div class="card-actions justify-end">
-                      <a class="btn btn-sm" href="{{ url_for('glosses.edit_gloss', language=gloss.language, slug=gloss.slug) }}">Edit</a>
-                      <form action="{{ url_for('glosses.delete_gloss', language=gloss.language, slug=gloss.slug) }}" method="post" onsubmit="return confirm('Delete this gloss?');">
-                        <button class="btn btn-error btn-sm" type="submit">Delete</button>
-                      </form>
-                    </div>
-                  </div>
-                </div>
-              {% endfor %}
+            <div class="overflow-x-auto">
+              <table class="table table-xs">
+                <thead>
+                  <tr>
+                    <th>Content</th>
+                    <th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for gloss in glosses %}
+                    <tr>
+                      <td class="whitespace-normal break-words">{{ gloss.content }}</td>
+                      <td class="text-right space-x-1">
+                        <a class="btn btn-xs" href="{{ url_for('glosses.edit_gloss', language=gloss.language, slug=gloss.slug) }}">Edit</a>
+                        <form action="{{ url_for('glosses.delete_gloss', language=gloss.language, slug=gloss.slug) }}" method="post" class="inline" onsubmit="return confirm('Delete this gloss?');">
+                          <button class="btn btn-xs" type="submit">Delete</button>
+                        </form>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
