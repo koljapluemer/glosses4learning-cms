@@ -8,7 +8,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from .gloss import Gloss, RELATIONSHIP_FIELDS
 from .language import get_language_store
 from .storage import get_storage
-from .utils import derive_slug, normalize_language_code, split_text_area, parse_key_value_lines
+from .utils import derive_slug, normalize_language_code, split_text_area, parse_key_value_lines, paraphrase_display, filter_translations
 
 bp = Blueprint("glosses", __name__)
 
@@ -201,3 +201,61 @@ def delete_gloss(language: str, slug: str):
     storage.delete_gloss(language, slug)
     flash("Gloss deleted.", "success")
     return redirect(url_for("glosses.index"))
+
+
+@bp.route("/glosses/<language>/<slug>/translations/compare/<target_language>", methods=["GET", "POST"])
+def translation_comparison(language: str, slug: str, target_language: str):
+    storage = get_storage()
+    base = storage.load_gloss(language, slug)
+    if not base:
+        flash("Gloss not found.", "error")
+        return redirect(url_for("glosses.index")), 404
+
+    if request.method == "POST":
+        note_content = (request.form.get("note_content") or "").strip()
+        translation_ref = request.form.get("translation_ref") or ""
+        if note_content and translation_ref:
+            translation = storage.resolve_reference(translation_ref)
+            if translation:
+                note = Gloss(content=note_content, language=base.language)
+                try:
+                    note = storage.create_gloss(note)
+                except FileExistsError:
+                    note = storage.ensure_gloss(base.language, note_content)
+                note_ref = f"{note.language}:{note.slug}"
+                if note_ref not in (translation.notes or []):
+                    translation.notes.append(note_ref)
+                    storage.save_gloss(translation)
+                flash("Note added.", "success")
+        return redirect(url_for("glosses.translation_comparison", language=language, slug=slug, target_language=target_language))
+
+    translation_refs = [ref for ref in (base.translations or []) if ref.startswith(f"{target_language}:")]
+    translations = []
+    for ref in translation_refs:
+        t = storage.resolve_reference(ref)
+        if not t:
+            continue
+        back_translations = []
+        for bt_ref in (t.translations or []):
+            if bt_ref.startswith(f"{base.language}:") and bt_ref != f"{base.language}:{base.slug}":
+                bt_gloss = storage.resolve_reference(bt_ref)
+                if bt_gloss:
+                    back_translations.append(bt_gloss)
+        note_glosses = []
+        for n_ref in (t.notes or []):
+            n_gloss = storage.resolve_reference(n_ref)
+            if n_gloss and n_gloss.language == base.language:
+                note_glosses.append(n_gloss)
+        translations.append({
+            "ref": ref,
+            "gloss": t,
+            "back_translations": back_translations,
+            "notes": note_glosses,
+        })
+
+    return render_template(
+        "translation_comparison.html",
+        base=base,
+        target_language=target_language,
+        translations=translations,
+    )

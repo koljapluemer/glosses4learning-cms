@@ -53,6 +53,11 @@ def relation_table(language: str, slug: str, field: str):
     base = _load_base(language, slug)
     rows = _relation_rows(base, field)
     languages = get_language_store().list_languages()
+    lang_groups = {}
+    if field == "translations":
+        for row in rows:
+            lang_groups.setdefault(row["iso"], 0)
+            lang_groups[row["iso"]] += 1
     return render_template(
         "partials/relation_table.html",
         base=base,
@@ -60,6 +65,7 @@ def relation_table(language: str, slug: str, field: str):
         rows=rows,
         languages=languages,
         allow_language_select=field in CROSS_LANGUAGE_RELATIONS,
+        lang_groups=lang_groups if field == "translations" else None,
         message=None,
         error=None,
     )
