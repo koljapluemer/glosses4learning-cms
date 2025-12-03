@@ -1,25 +1,18 @@
 {% extends "layout.html" %}
 {% block content %}
-  <div class="mb-4">
-    <h1 class="text-2xl font-bold">{{ 'New gloss' if mode == 'create' else 'Edit gloss' }}</h1>
-    <p class="text-sm text-base-content/70">Content is required; everything else is optional.</p>
-  </div>
-
   <form class="space-y-4" action="{% if mode == 'create' %}{{ url_for('glosses.create_gloss') }}{% else %}{{ url_for('glosses.update_gloss', language=gloss.language, slug=gloss.slug) }}{% endif %}" method="post">
-    <div class="card bg-base-100 shadow-md">
-      <div class="card-body space-y-3">
-        <label class="form-control">
-          <div class="label">
-            <span class="label-text font-semibold">Content *</span>
-          </div>
-          <textarea name="content" class="textarea textarea-bordered" required rows="2" placeholder="Surface form or definition">{{ gloss.content }}</textarea>
-        </label>
-
-        <div class="grid md:grid-cols-2 gap-3">
+    <div class="sticky top-0 z-20 bg-base-100/90 backdrop-blur shadow-sm border border-base-200 rounded-lg mb-4">
+      <div class="p-4 flex flex-col gap-3">
+        <div class="flex flex-wrap gap-2">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('glosses.index') }}">Cancel</a>
+          <button class="btn btn-sm" type="submit" name="next_action" value="list">Save &amp; to list</button>
+          <button class="btn btn-sm" type="submit" name="next_action" value="add_another">Save &amp; add another</button>
+          <button class="btn btn-primary btn-sm" type="submit" name="next_action" value="stay">{{ 'Create' if mode == 'create' else 'Save' }}</button>
+        </div>
+        <div class="grid md:grid-cols-[1fr_1fr] gap-3 items-start">
           <label class="form-control">
             <div class="label">
-              <span class="label-text font-semibold">Language code (ISO 639-3)</span>
-              <span class="label-text-alt">defaults to UND</span>
+              <span class="label-text font-semibold">Language (ISO 639-3)</span>
             </div>
             {% if languages %}
               <select name="language" class="select select-bordered" {% if mode == 'create' %}data-remember-language="true"{% endif %}>
@@ -33,10 +26,9 @@
           </label>
           <label class="form-control">
             <div class="label">
-              <span class="label-text font-semibold">Transcriptions</span>
-              <span class="label-text-alt">key: value per line</span>
+              <span class="label-text font-semibold">Content *</span>
             </div>
-            <textarea name="transcriptions" class="textarea textarea-bordered" rows="3">{% if gloss.transcriptions %}{% for k, v in gloss.transcriptions.items() %}{{ k }}: {{ v }}{% if not loop.last %}\n{% endif %}{% endfor %}{% endif %}</textarea>
+            <textarea name="content" class="textarea textarea-bordered" required rows="2" placeholder="Surface form or definition">{{ gloss.content }}</textarea>
           </label>
         </div>
       </div>
@@ -44,7 +36,74 @@
 
     {% if gloss.slug %}
       <div class="space-y-4">
-        {% for field in relationships %}
+        <!-- Translations first -->
+        <div hx-get="{{ url_for('htmx.relation_table', language=gloss.language, slug=gloss.slug, field='translations') }}"
+             hx-trigger="load"
+             hx-target="this"
+             hx-swap="outerHTML">
+          <div class="card bg-base-100 shadow-md">
+            <div class="card-body">
+              <div class="skeleton h-6 w-32 mb-2"></div>
+              <div class="skeleton h-4 w-full"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Translation AI tool -->
+        <div hx-get="{{ url_for('htmx.translation_tool', language=gloss.language, slug=gloss.slug) }}"
+             hx-trigger="load"
+             hx-target="this"
+             hx-swap="outerHTML">
+          <div class="card bg-base-100 shadow-md">
+            <div class="card-body">
+              <div class="skeleton h-6 w-32 mb-2"></div>
+              <div class="skeleton h-4 w-full"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div hx-get="{{ url_for('htmx.relation_table', language=gloss.language, slug=gloss.slug, field='tags') }}"
+             hx-trigger="load"
+             hx-target="this"
+             hx-swap="outerHTML">
+          <div class="card bg-base-100 shadow-md">
+            <div class="card-body">
+              <div class="skeleton h-6 w-32 mb-2"></div>
+              <div class="skeleton h-4 w-full"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div hx-get="{{ url_for('htmx.relation_table', language=gloss.language, slug=gloss.slug, field='notes') }}"
+             hx-trigger="load"
+             hx-target="this"
+             hx-swap="outerHTML">
+          <div class="card bg-base-100 shadow-md">
+            <div class="card-body">
+              <div class="skeleton h-6 w-32 mb-2"></div>
+              <div class="skeleton h-4 w-full"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transcriptions -->
+        <div class="card bg-base-100 shadow-md">
+          <div class="card-body">
+            <label class="form-control">
+              <div class="label">
+                <span class="label-text font-semibold">Transcriptions</span>
+                <span class="label-text-alt">key: value per line</span>
+              </div>
+              <textarea name="transcriptions" class="textarea textarea-bordered" rows="3">{% if gloss.transcriptions %}{% for k, v in gloss.transcriptions.items() %}{{ k }}: {{ v }}{% if not loop.last %}\n{% endif %}{% endfor %}{% endif %}</textarea>
+            </label>
+          </div>
+        </div>
+
+        <!-- Within-language relations -->
+        {% set within_fields = ['morphologically_related','parts','has_similar_meaning','sounds_similar','usage_examples','to_be_differentiated_from','collocations','typical_follow_up','children'] %}
+        {% for field in within_fields %}
           <div hx-get="{{ url_for('htmx.relation_table', language=gloss.language, slug=gloss.slug, field=field) }}"
                hx-trigger="load"
                hx-target="this"
@@ -57,18 +116,6 @@
             </div>
           </div>
         {% endfor %}
-        <div id="translation-tool"
-             hx-get="{{ url_for('htmx.translation_tool', language=gloss.language, slug=gloss.slug) }}"
-             hx-trigger="load"
-             hx-target="this"
-             hx-swap="outerHTML">
-          <div class="card bg-base-100 shadow-md">
-            <div class="card-body">
-              <div class="skeleton h-6 w-32 mb-2"></div>
-              <div class="skeleton h-4 w-full"></div>
-            </div>
-          </div>
-        </div>
       </div>
     {% else %}
       <div class="alert">
@@ -76,9 +123,14 @@
       </div>
     {% endif %}
 
-    <div class="flex gap-3">
-      <button class="btn btn-primary" type="submit">{{ 'Create' if mode == 'create' else 'Save changes' }}</button>
+    <div class="flex gap-3 items-center">
+      <button class="btn btn-primary" type="submit" name="next_action" value="stay">{{ 'Create' if mode == 'create' else 'Save changes' }}</button>
       <a class="btn btn-ghost" href="{{ url_for('glosses.index') }}">Cancel</a>
+      {% if gloss.slug %}
+        <form action="{{ url_for('glosses.delete_gloss', language=gloss.language, slug=gloss.slug) }}" method="post" onsubmit="return confirm('Delete this gloss?');">
+          <button class="btn btn-error" type="submit">Delete gloss</button>
+        </form>
+      {% endif %}
     </div>
   </form>
 

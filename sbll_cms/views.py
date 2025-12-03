@@ -74,6 +74,7 @@ def new_gloss():
 def create_gloss():
     gloss = _gloss_from_form()
     languages = get_language_store().list_languages()
+    next_action = request.form.get("next_action") or "stay"
     errors = _validate_gloss(gloss)
     if errors:
         for message in errors:
@@ -109,6 +110,10 @@ def create_gloss():
         ), 400
 
     flash("Gloss created.", "success")
+    if next_action == "list":
+        return redirect(url_for("glosses.index"))
+    if next_action == "add_another":
+        return redirect(url_for("glosses.new_gloss"))
     return redirect(url_for("glosses.edit_gloss", language=saved.language, slug=saved.slug))
 
 
@@ -144,6 +149,7 @@ def update_gloss(language: str, slug: str):
     for rel_field in RELATIONSHIP_FIELDS:
         setattr(updated, rel_field, getattr(current, rel_field))
     languages = get_language_store().list_languages()
+    next_action = request.form.get("next_action") or "stay"
     errors = _validate_gloss(updated)
     if errors:
         for message in errors:
@@ -178,6 +184,10 @@ def update_gloss(language: str, slug: str):
         ), 400
 
     flash("Gloss updated.", "success")
+    if next_action == "list":
+        return redirect(url_for("glosses.index"))
+    if next_action == "add_another":
+        return redirect(url_for("glosses.new_gloss"))
     return redirect(url_for("glosses.edit_gloss", language=saved.language, slug=saved.slug))
 
 
