@@ -16,10 +16,12 @@ class GlossStorage:
     def __init__(self, data_root: Path):
         self.data_root = Path(data_root)
         self.data_root.mkdir(parents=True, exist_ok=True)
+        self.gloss_root = self.data_root / "gloss"
+        self.gloss_root.mkdir(parents=True, exist_ok=True)
 
     def _language_dir(self, language: str) -> Path:
         lang = normalize_language_code(language)
-        target = self.data_root / lang
+        target = self.gloss_root / lang
         target.mkdir(parents=True, exist_ok=True)
         return target
 
@@ -28,10 +30,10 @@ class GlossStorage:
 
     def list_glosses(self) -> list[Gloss]:
         glosses: list[Gloss] = []
-        if not self.data_root.exists():
+        if not self.gloss_root.exists():
             return glosses
 
-        for language_dir in sorted(self.data_root.iterdir()):
+        for language_dir in sorted(self.gloss_root.iterdir()):
             if not language_dir.is_dir():
                 continue
             for gloss_file in sorted(language_dir.glob("*.json")):

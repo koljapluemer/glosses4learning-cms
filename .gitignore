@@ -10,5 +10,5 @@ wheels/
 .venv
 
 # Local data
-data/*
-!data/.gitkeep
+data/gloss/**
+!data/gloss/.gitkeep

@@ -16,5 +16,6 @@ Then open http://127.0.0.1:5000.
 Notes
 -----
 
-- Gloss files live in `data/<iso>/<slug>.json`, where `slug` is the content with illegal filename characters removed.
+- Gloss files live in `data/gloss/<iso>/<slug>.json`, where `slug` is the content with illegal filename characters removed.
 - A JSON Schema for gloss files is available at `schema/gloss.schema.json`.
+- Language definitions live in `data/language/<iso>.json`; see `schema/language.schema.json` for the schema and example files for English and German.
