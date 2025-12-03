@@ -58,7 +58,7 @@ def manage_situation(language: str, slug: str):
         node = {"gloss": gloss, "children": build_part_nodes(gloss, resolve)}
         root_nodes.append(node)
 
-    tree_lines = render_tree(root_nodes, target_language=target_language, storage=storage)
+    tree_lines = render_tree(root_nodes, target_language=target_language, storage=storage, native_language=native_language)
 
     # Flatten nodes for translation table
     flat_glosses = dedupe_glosses(root_nodes)
@@ -145,8 +145,9 @@ def build_part_nodes(gloss, resolve_func):
     return children
 
 
-def render_tree(nodes, target_language: str = "", storage=None):
+def render_tree(nodes, target_language: str = "", storage=None, native_language: str = ""):
     lines: list[str] = []
+    seen: set[str] = set()
 
     def label_for(gloss):
         text = paraphrase_display(gloss)
@@ -158,16 +159,49 @@ def render_tree(nodes, target_language: str = "", storage=None):
         for idx, node in enumerate(node_list):
             is_last = idx == total - 1
             connector = "└── " if is_last else "├── "
-            lines.append(f"{prefix}{connector}{label_for(node['gloss'])}")
+            marker = node.get("marker", "")
+            gloss = node["gloss"]
+            key = f"{gloss.language}:{gloss.slug}"
+            lines.append(f"{prefix}{connector}{marker}{label_for(gloss)}")
+            if key in seen:
+                continue
+            seen.add(key)
             new_prefix = f"{prefix}{'    ' if is_last else '│   '}"
             combined_children = list(node["children"])
-            if target_language and storage:
-                translations = [ref for ref in (node["gloss"].translations or []) if ref.startswith(f"{target_language}:")]
+            stop = node.get("stop", False)
+            if target_language and storage and not stop:
+                translations = [ref for ref in (gloss.translations or []) if ref.startswith(f"{target_language}:")]
                 for t_ref in translations:
                     t_gloss = storage.resolve_reference(t_ref)
                     if not t_gloss:
                         continue
                     combined_children.append({"gloss": t_gloss, "children": build_part_nodes(t_gloss, storage.resolve_reference)})
+
+            # usage examples and back translations (no deep recursion)
+            if target_language and storage and gloss.language == target_language and not stop:
+                usage_children = []
+                for u_ref in getattr(gloss, "usage_examples", []):
+                    u_gloss = storage.resolve_reference(u_ref)
+                    if not u_gloss:
+                        continue
+                    u_child_children = []
+                    # parts of usage example and their back translations
+                    for part_ref in (u_gloss.parts or []):
+                        part_gloss = storage.resolve_reference(part_ref)
+                        if not part_gloss:
+                            continue
+                        part_children = []
+                        if native_language:
+                            part_back = [ref for ref in (part_gloss.translations or []) if ref.startswith(f"{native_language}:")]
+                            for pb_ref in part_back:
+                                pb_gloss = storage.resolve_reference(pb_ref)
+                                if pb_gloss:
+                                    part_children.append({"gloss": pb_gloss, "children": [], "stop": True})
+                        u_child_children.append({"gloss": part_gloss, "children": part_children, "stop": True})
+
+                    u_child = {"gloss": u_gloss, "children": u_child_children, "marker": "🛠 ", "stop": True}
+                    usage_children.append(u_child)
+                combined_children.extend(usage_children)
             if combined_children:
                 walk(combined_children, new_prefix)
 
