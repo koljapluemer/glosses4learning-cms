@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sbll-cms.local/schema/gloss.schema.json",
+  "title": "Gloss",
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "string",
+      "description": "Surface form or definition of the gloss."
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{3}$",
+      "description": "ISO 639-3 code for the gloss language.",
+      "default": "und"
+    },
+    "transcriptions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "contains": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "near_synonyms": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "near_homophones": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "translations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "clarifies_usage": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "to_be_differentiated_from": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    },
+    "collocations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/GlossRef" },
+      "default": []
+    }
+  },
+  "required": ["content"],
+  "additionalProperties": false,
+  "$defs": {
+    "GlossRef": {
+      "type": "string",
+      "pattern": "^[a-z]{3}:[^<>:\"/\\\\|?*]+$",
+      "description": "Reference to another gloss as $iso_code:$slug"
+    }
+  },
+  "examples": [
+    {
+      "content": "bonjour",
+      "language": "fra",
+      "transcriptions": ["bɔ̃.ʒuʁ"],
+      "translations": ["eng:hello"]
+    }
+  ]
+}

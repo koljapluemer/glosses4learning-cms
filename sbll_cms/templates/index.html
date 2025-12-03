@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block content %}
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h1 class="text-2xl font-bold">Glosses</h1>
+      <p class="text-sm text-base-content/70">Languages are grouped by ISO 639-3 code.</p>
+    </div>
+    <a href="{{ url_for('glosses.new_gloss') }}" class="btn btn-primary">Add gloss</a>
+  </div>
+
+  {% if grouped_glosses %}
+    <div class="space-y-6">
+      {% for language, glosses in grouped_glosses %}
+        <div class="card bg-base-100 shadow-md">
+          <div class="card-body">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="card-title uppercase">{{ language }}</h2>
+              <span class="badge badge-neutral">{{ glosses|length }} item{{ 's' if glosses|length != 1 else '' }}</span>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3">
+              {% for gloss in glosses %}
+                <div class="card bg-base-200">
+                  <div class="card-body">
+                    <h3 class="font-semibold mb-1">{{ gloss.content }}</h3>
+                    <p class="text-xs text-base-content/70 break-all">{{ gloss.language }}:{{ gloss.slug or gloss.content }}</p>
+                    <div class="card-actions justify-end">
+                      <a class="btn btn-sm" href="{{ url_for('glosses.edit_gloss', language=gloss.language, slug=gloss.slug) }}">Edit</a>
+                      <form action="{{ url_for('glosses.delete_gloss', language=gloss.language, slug=gloss.slug) }}" method="post" onsubmit="return confirm('Delete this gloss?');">
+                        <button class="btn btn-error btn-sm" type="submit">Delete</button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert">
+      <span>No glosses found yet. Create one to get started.</span>
+    </div>
+  {% endif %}
+{% endblock %}

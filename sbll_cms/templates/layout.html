@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.12/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <title>{{ title if title else "Gloss CMS" }}</title>
+</head>
+<body class="min-h-screen bg-base-200 text-base-content">
+  <div class="navbar bg-base-100 shadow-md">
+    <div class="flex-1 px-4">
+      <a href="{{ url_for('glosses.index') }}" class="text-xl font-semibold">Gloss CMS</a>
+    </div>
+    <div class="flex-none gap-2 px-4">
+      <a href="{{ url_for('glosses.new_gloss') }}" class="btn btn-primary btn-sm">New gloss</a>
+    </div>
+  </div>
+
+  <main class="container mx-auto px-4 py-6 max-w-5xl">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="space-y-2 mb-4">
+          {% for category, message in messages %}
+            <div class="alert {{ 'alert-success' if category == 'success' else 'alert-error' }}">
+              <span>{{ message }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+{% block content %}
+  <div class="mb-4">
+    <h1 class="text-2xl font-bold">{{ 'New gloss' if mode == 'create' else 'Edit gloss' }}</h1>
+    <p class="text-sm text-base-content/70">Content is required; everything else is optional.</p>
+  </div>
+
+  <form class="space-y-4" action="{% if mode == 'create' %}{{ url_for('glosses.create_gloss') }}{% else %}{{ url_for('glosses.update_gloss', language=gloss.language, slug=gloss.slug) }}{% endif %}" method="post">
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body space-y-3">
+        <label class="form-control">
+          <div class="label">
+            <span class="label-text font-semibold">Content *</span>
+          </div>
+          <textarea name="content" class="textarea textarea-bordered" required rows="2" placeholder="Surface form or definition">{{ gloss.content }}</textarea>
+        </label>
+
+        <div class="grid md:grid-cols-2 gap-3">
+          <label class="form-control">
+            <div class="label">
+              <span class="label-text font-semibold">Language code (ISO 639-3)</span>
+              <span class="label-text-alt">defaults to UND</span>
+            </div>
+            <input type="text" name="language" value="{{ gloss.language or '' }}" class="input input-bordered" maxlength="3" placeholder="eng" />
+          </label>
+          <label class="form-control">
+            <div class="label">
+              <span class="label-text font-semibold">Transcriptions</span>
+              <span class="label-text-alt">one per line</span>
+            </div>
+            <textarea name="transcriptions" class="textarea textarea-bordered" rows="2">{% if gloss.transcriptions %}{{ gloss.transcriptions | join('\n') }}{% endif %}</textarea>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body grid md:grid-cols-2 gap-4">
+        {% for field in relationships %}
+          <label class="form-control">
+            <div class="label">
+              <span class="label-text font-semibold">{{ field.replace('_', ' ').title() }}</span>
+              <span class="label-text-alt">$iso:$slug, one per line</span>
+            </div>
+            <textarea name="{{ field }}" class="textarea textarea-bordered" rows="2">{% set values = gloss|attr(field) %}{% if values %}{{ values | join('\n') }}{% endif %}</textarea>
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <button class="btn btn-primary" type="submit">{{ 'Create' if mode == 'create' else 'Save changes' }}</button>
+      <a class="btn btn-ghost" href="{{ url_for('glosses.index') }}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}
