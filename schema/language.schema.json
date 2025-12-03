@@ -17,7 +17,7 @@
       "type": "string",
       "description": "Short symbol or abbreviation for UI display."
     },
-    "ai_note": {
+    "aiNote": {
       "type": "string",
       "description": "Optional hint for LLMs when translating into this language."
     }

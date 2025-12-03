@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from markupsafe import Markup
-from flask import Blueprint, abort, render_template, request
+from flask import Blueprint, abort, render_template, request, redirect, url_for, flash
+import json
 
 from .storage import get_storage
 from .language import get_language_store
+from flask import current_app
 from .utils import paraphrase_display
+from .translation_tool import TranslationRequest, translate
+from .gloss import Gloss
+from .relations import attach_relation
 
 bp = Blueprint("specialist", __name__)
 
@@ -29,14 +34,16 @@ def situation_list():
     return render_template("specialist/situations_list.html", glosses=glosses)
 
 
-@bp.route("/situations/<language>/<slug>")
+@bp.route("/situations/<language>/<slug>", methods=["GET", "POST"])
 def manage_situation(language: str, slug: str):
     storage = get_storage()
     situation = storage.load_gloss(language, slug)
     if not situation:
         abort(404)
-    target_language = request.args.get("target_language") or ""
-    native_language = request.args.get("native_language") or ""
+    target_language = request.values.get("target_language") or ""
+    native_language = request.values.get("native_language") or ""
+    model = request.values.get("model") or "OpenAI|gpt-4o-mini"
+    action = request.values.get("action") or ""
 
     def resolve(ref: str):
         return storage.resolve_reference(ref)
@@ -58,6 +65,60 @@ def manage_situation(language: str, slug: str):
     flat_glosses = [g for g in flat_glosses if not native_language or g.language == native_language]
 
     languages = get_language_store().list_languages()
+    auto_results = []
+
+    if request.method == "POST" and action:
+        if action == "generate_auto":
+            if not target_language:
+                flash("Choose a target language before auto-translating.", "error")
+            else:
+                # find glosses missing translations in target lang
+                candidates = [g for g in flat_glosses if not any(t.startswith(f"{target_language}:") for t in (g.translations or []))]
+                settings = current_app.extensions["settings_store"].load()
+                for gloss in candidates:
+                    context = f"Situation: {situation.content}. Translate in the context of this situation."
+                    if gloss.tags and any(tag.endswith("paraphrase") for tag in gloss.tags):
+                        context += " This is a paraphrase; do not translate brackets literally—return how you would naturally express this."
+                    req = TranslationRequest(
+                        gloss=gloss,
+                        target_language=target_language,
+                        provider="OpenAI",
+                        model=model.split("|", 1)[1],
+                        context=context,
+                    )
+                    result = translate(req, settings, get_language_store())
+                    auto_results.append({
+                        "ref": f"{gloss.language}:{gloss.slug}",
+                        "content": paraphrase_display(gloss),
+                        "translations": result.translations or [],
+                        "error": result.error,
+                    })
+        elif action == "accept_generated":
+            payload = request.form.get("generated_payload") or ""
+            selected = {s.strip() for s in request.form.getlist("selected_ref") if s.strip()}
+            try:
+                parsed = json.loads(payload)
+            except Exception:
+                parsed = []
+            added = 0
+            for entry in parsed:
+                ref = (entry.get("ref") or "").strip()
+                if ref not in selected:
+                    continue
+                translations = entry.get("translations") or []
+                src = storage.resolve_reference(ref)
+                if not src:
+                    continue
+                for t_text in translations:
+                    existing = storage.find_gloss_by_content(target_language, t_text)
+                    if existing:
+                        target = existing
+                    else:
+                        target = storage.create_gloss(Gloss(content=t_text, language=target_language, tags=["machine-translation"]))
+                    attach_relation(storage, src, "translations", target)
+                    added += 1
+            flash(f"Added {added} translations.", "success")
+            return redirect(url_for("specialist.manage_situation", language=language, slug=slug, target_language=target_language, native_language=native_language))
 
     return render_template(
         "specialist/situation_manage.html",
@@ -68,6 +129,8 @@ def manage_situation(language: str, slug: str):
         flat_glosses=flat_glosses,
         languages=languages,
         storage=storage,
+        model=model,
+        auto_results=auto_results,
     )
 
 
