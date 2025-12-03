@@ -99,6 +99,12 @@ def add_relation(language: str, slug: str, field: str):
 
     if not error:
         attach_relation(storage, base, field, target)
+        # If base uses target as usage example, ensure reverse part link.
+        if field == "usage_examples":
+            base_ref = f"{base.language}:{base.slug}"
+            if base_ref not in (target.parts or []):
+                target.parts.append(base_ref)
+                storage.save_gloss(target)
         message = "Relation added."
     else:
         message = None
