@@ -184,6 +184,7 @@ def translation_tool(language: str, slug: str):
     context = request.form.get("context") or ""
     action = request.form.get("action") or "generate"
     translations_json = request.form.get("translations_json") or ""
+    selected_refs = request.form.getlist("selected_translation")
     try:
         translations_list = json.loads(translations_json) if translations_json else []
     except Exception:
@@ -199,29 +200,28 @@ def translation_tool(language: str, slug: str):
 
     try:
         if request.method == "POST":
-            if action in ("accept", "keep", "discard"):
-                if not translations_list:
+            if action in ("accept_all", "accept_selection", "discard_all"):
+                if action != "discard_all" and not translations_list:
                     error = "No translation text to process."
                 elif not target_language:
                     error = "Target language missing."
                 else:
-                    if action == "accept":
+                    to_accept = translations_list if action == "accept_all" else [t for t in translations_list if t in selected_refs]
+                    if action == "discard_all":
+                        message = "Discarded."
+                    elif not to_accept:
+                        error = "No translations selected."
+                    else:
                         from .relations import attach_relation
 
-                        for t_text in translations_list:
+                        for t_text in to_accept:
                             existing = storage.find_gloss_by_content(target_language, t_text)
                             if existing:
                                 target = existing
                             else:
                                 target = storage.create_gloss(Gloss(content=t_text, language=target_language, tags=["machine-translation"]))
                             attach_relation(storage, gloss, "translations", target)
-                        message = "Translation added."
-                    elif action == "keep":
-                        for t_text in translations_list:
-                            storage.ensure_gloss(target_language, t_text)
-                        message = "Translation saved as gloss."
-                    elif action == "discard":
-                        message = "Discarded."
+                        message = "Translations added."
                     translations_list = []
                     result = None
             else:
