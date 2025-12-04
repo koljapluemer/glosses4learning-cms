@@ -20,6 +20,11 @@ It's...well, the gloss itself, for example "banana" or "ich renne" or "It rained
 - key should be a string describing the kind of transcription, e.g. "IPA narrow"
 - value should be the transcription, e.g. "[aɪ̯ pʰiː eɪ̯]"
 
+#### `logs`
+
+- A dictionary where keys are ISO timestamps (`2024-08-01T12:00:00Z`) and values are free-form strings
+- Used for lightweight audit or workflow markers such as `SPLIT_CONSIDERED_UNNECESSARY`
+
 ### Relationships to other Glosses
 
 Relationships to other glosses are generally encoded as "$iso_code:$slug" (`slug` is equivalent to `content` with characters that are illegal in filenames removed)

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+import json
+
 from markupsafe import Markup
 from flask import Blueprint, abort, render_template, request
 
@@ -8,6 +11,8 @@ from .language import get_language_store
 from .utils import paraphrase_display
 
 bp = Blueprint("specialist", __name__)
+
+SPLIT_LOG_MARKER = "SPLIT_CONSIDERED_UNNECESSARY"
 
 
 @bp.route("/")
@@ -40,6 +45,7 @@ def manage_situation(language: str, slug: str):
 
     languages = get_language_store().list_languages()
     tree_lines: list[str] = []
+    affected_refs: list[str] = []
 
     if native_language and target_language:
         goal_nodes = build_goal_nodes(
@@ -49,6 +55,12 @@ def manage_situation(language: str, slug: str):
             target_language=target_language,
         )
         tree_lines = render_tree(goal_nodes)
+        glosses_in_tree = collect_glosses(goal_nodes)
+        affected_refs = [
+            f"{g.language}:{g.slug}"
+            for g in glosses_in_tree
+            if g.slug and should_break_up(g)
+        ]
 
     return render_template(
         "specialist/situation_manage.html",
@@ -57,6 +69,8 @@ def manage_situation(language: str, slug: str):
         target_language=target_language,
         native_language=native_language,
         languages=languages,
+        break_up_refs_json=json.dumps(affected_refs),
+        break_up_count=len(affected_refs),
     )
 
 
@@ -210,3 +224,80 @@ def render_tree(nodes):
 
     walk(nodes)
     return lines
+
+
+@bp.route("/situations/tools/break-up", methods=["POST"])
+def break_up_glosses():
+    storage = get_storage()
+    refs_raw = request.form.get("refs") or "[]"
+    action = (request.form.get("action") or "").strip()
+    target_ref = (request.form.get("ref") or "").strip()
+    refs = parse_refs(refs_raw)
+
+    if action == "mark_skip" and target_ref:
+        gloss = storage.resolve_reference(target_ref)
+        if gloss:
+            logs = gloss.logs if isinstance(getattr(gloss, "logs", {}), dict) else {}
+            logs[datetime.utcnow().isoformat() + "Z"] = SPLIT_LOG_MARKER
+            gloss.logs = logs
+            storage.save_gloss(gloss)
+
+    glosses: list = []
+    seen: set[str] = set()
+    for ref in refs:
+        if ref in seen:
+            continue
+        seen.add(ref)
+        gloss = storage.resolve_reference(ref)
+        if gloss and should_break_up(gloss):
+            glosses.append(gloss)
+
+    return render_template(
+        "specialist/break_up_glosses.html",
+        glosses=glosses,
+        refs_json=json.dumps(refs),
+    )
+
+
+def should_break_up(gloss) -> bool:
+    no_parts = not (getattr(gloss, "parts", None) or [])
+    logs = getattr(gloss, "logs", {}) or {}
+    skip_marked = False
+    if isinstance(logs, dict):
+        skip_marked = any(SPLIT_LOG_MARKER in str(val) for val in logs.values())
+    return no_parts and not skip_marked
+
+
+def collect_glosses(nodes):
+    seen: set[str] = set()
+    ordered = []
+
+    def walk(node_list):
+        for node in node_list:
+            gloss = node["gloss"]
+            ref = f"{gloss.language}:{gloss.slug or gloss.content}"
+            if ref not in seen:
+                seen.add(ref)
+                ordered.append(gloss)
+            for child in node.get("children", []):
+                walk([child])
+
+    walk(nodes)
+    return ordered
+
+
+def parse_refs(raw: str) -> list[str]:
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    refs: list[str] = []
+    for item in parsed:
+        if not isinstance(item, str):
+            continue
+        val = item.strip()
+        if val:
+            refs.append(val)
+    return refs

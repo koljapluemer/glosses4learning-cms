@@ -25,3 +25,21 @@ It's already quite nice, but we need the following changes:
     - For each of the glosses added as parts of usage examples, resolve `translations` into the native lang once and attach.
 
 Remove everything else from the page, it's now obsolete. Yes, REMOVE not "comment out" or "migrate".
+
+### Tool Links
+
+Let's start linking to tools from below the tree view.
+Our first tool is going to be "Break up glosses with no parts ($number_of_affected_glosses)".
+
+To implement this correctly, we need to amend [the gloss schema](schema/gloss.schema.json) and [its doc](docs/reference/gloss_file.md).
+Add an optional prop `logs` which should be an object with ISO timestamps as keys and arbitrary strings as the prop.
+
+Glosses that are not yet "broken up" means all glosses where both is true:
+
+- they do not have `parts`, or it's an empty `[]`
+- they do not have "SPLIT_CONSIDERED_UNNECESSARY" in any of their log values
+
+
+"Break up glosses with no parts  ($number_of_affected_glosses)" is supposed to be a simple button, `POST`ing to a new tool view (new route etc, let's make it clean) a list of such affected glosses from the situation tree.
+
+For now, let's make the view simple: a daisy table, one gloss in a row. One column the `content` which is also a clickable _blank link, another column an sm button "Can't be broken up" which adds such a "SPLIT_CONSIDERED_UNNECESSARY" log to the gloss object. Nothing else yet.

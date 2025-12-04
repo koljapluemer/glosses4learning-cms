@@ -20,6 +20,15 @@
       "additionalProperties": { "type": "string" },
       "default": {}
     },
+    "logs": {
+      "type": "object",
+      "description": "Log entries keyed by ISO timestamps.",
+      "patternProperties": {
+        "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})?$": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "default": {}
+    },
     "morphologically_related": {
       "type": "array",
       "items": { "$ref": "#/$defs/GlossRef" },

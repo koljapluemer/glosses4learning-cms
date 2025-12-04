@@ -27,6 +27,7 @@ class Gloss:
     content: str
     language: str = "und"
     transcriptions: dict[str, str] = field(default_factory=dict)
+    logs: dict[str, str] = field(default_factory=dict)
     morphologically_related: list[str] = field(default_factory=list)
     parts: list[str] = field(default_factory=list)
     has_similar_meaning: list[str] = field(default_factory=list)
@@ -47,6 +48,7 @@ class Gloss:
             content=data.get("content", ""),
             language=normalize_language_code(language or data.get("language", "und")),
             transcriptions=dict(data.get("transcriptions", {}) or {}),
+            logs=dict(data.get("logs", {}) or {}),
             morphologically_related=list(data.get("morphologically_related", []) or []),
             parts=list(data.get("parts", []) or []),
             has_similar_meaning=list(data.get("has_similar_meaning", []) or []),
@@ -67,6 +69,7 @@ class Gloss:
             "content": self.content,
             "language": normalize_language_code(self.language),
             "transcriptions": self.transcriptions,
+            "logs": self.logs,
             "morphologically_related": self.morphologically_related,
             "parts": self.parts,
             "has_similar_meaning": self.has_similar_meaning,

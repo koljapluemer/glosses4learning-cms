@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% set title = "Break up glosses" %}
+{% block content %}
+  <div class="mb-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Break up glosses with no parts</h1>
+      <p class="text-sm text-base-content/70">Mark glosses that cannot be split further.</p>
+    </div>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('specialist.situation_list') }}">Back to situations</a>
+  </div>
+
+  <div class="card bg-base-100 shadow-md">
+    <div class="card-body">
+      {% if glosses %}
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Gloss</th>
+                <th class="text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for gloss in glosses %}
+                <tr>
+                  <td>
+                    <a class="link link-primary" target="_blank" href="{{ url_for('glosses.edit_gloss', language=gloss.language, slug=gloss.slug) }}">{{ gloss|paraphrase }}</a>
+                    <div class="text-xs text-base-content/70">{{ gloss.language }}:{{ gloss.slug }}</div>
+                  </td>
+                  <td class="text-right">
+                    <form method="post">
+                      <input type="hidden" name="action" value="mark_skip" />
+                      <input type="hidden" name="ref" value="{{ gloss.language }}:{{ gloss.slug }}" />
+                      <input type="hidden" name="refs" value='{{ refs_json|safe }}' />
+                      <button class="btn btn-sm" type="submit">Can't be broken up</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert">
+          <span>All provided glosses already have parts or were marked as not splittable.</span>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
