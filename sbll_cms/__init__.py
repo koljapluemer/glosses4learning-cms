@@ -21,7 +21,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     app.extensions["gloss_storage"] = storage
     language_store = LanguageStore(storage.data_root / "language")
     app.extensions["language_store"] = language_store
-    settings_store = SettingsStore(storage.data_root)
+    settings_store = SettingsStore()
     app.extensions["settings_store"] = settings_store
 
     app.jinja_env.filters["paraphrase"] = paraphrase_display

@@ -36,6 +36,26 @@
   </main>
   <script>
     (() => {
+      // Sync localStorage settings to backend session on page load
+      const syncSettings = async () => {
+        const STORAGE_KEY = 'sbll_cms_settings';
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            const settings = JSON.parse(stored);
+            await fetch('{{ url_for("settings.update_settings") }}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(settings),
+            });
+          }
+        } catch (e) {
+          console.error('Error syncing settings:', e);
+        }
+      };
+
       const applyRemember = (select, key) => {
         if (!select || select.dataset.rememberInitialized) return;
         const stored = window.localStorage.getItem(key);
@@ -52,7 +72,10 @@
         root.querySelectorAll("select[data-remember-language]").forEach(sel => applyRemember(sel, "lastLanguage"));
       };
 
-      document.addEventListener("DOMContentLoaded", () => initRelationSelects());
+      document.addEventListener("DOMContentLoaded", () => {
+        syncSettings();
+        initRelationSelects();
+      });
       document.body.addEventListener("htmx:afterSwap", (event) => {
         initRelationSelects(event.target);
       });

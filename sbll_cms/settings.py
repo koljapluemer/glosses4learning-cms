@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, asdict
-from pathlib import Path
-
-
-SETTINGS_FILE = "settings.json"
+from flask import session
 
 
 @dataclass
@@ -32,18 +28,10 @@ class Settings:
 
 
 class SettingsStore:
-    def __init__(self, data_root: Path):
-        self.path = Path(data_root) / SETTINGS_FILE
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-
     def load(self) -> Settings:
-        if not self.path.exists():
-            return Settings.default()
-        with self.path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        return Settings.from_dict(data)
+        settings_data = session.get("settings", {})
+        return Settings.from_dict(settings_data)
 
     def save(self, settings: Settings) -> None:
-        with self.path.open("w", encoding="utf-8") as handle:
-            json.dump(settings.to_dict(), handle, indent=2)
+        session["settings"] = settings.to_dict()
 
