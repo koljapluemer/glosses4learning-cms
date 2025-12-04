@@ -230,10 +230,11 @@ def render_tree(nodes):
     return lines
 
 
-@bp.route("/situations/tools/break-up", methods=["POST"])
+@bp.route("/situations/tools/break-up", methods=["GET", "POST"])
 def break_up_glosses():
     storage = get_storage()
-    refs_raw = request.form.get("refs") or "[]"
+
+    refs_raw = request.values.get("refs") or "[]"
     action = (request.form.get("action") or "").strip()
     target_ref = (request.form.get("ref") or "").strip()
     selected_refs = [r.strip() for r in (request.form.getlist("selected_ref") or []) if r.strip() and REF_PATTERN.match(r.strip())]
@@ -247,82 +248,83 @@ def break_up_glosses():
     settings = current_app.extensions["settings_store"].load()
     refs = parse_refs(refs_raw)
 
-    if action == "mark_skip":
-        targets = selected_refs or ([target_ref] if target_ref and REF_PATTERN.match(target_ref) else [])
-        for ref in targets:
-            if not REF_PATTERN.match(ref):
-                continue
-            gloss = storage.resolve_reference(ref)
-            if gloss:
-                logs = gloss.logs if isinstance(getattr(gloss, "logs", {}), dict) else {}
-                logs[datetime.utcnow().isoformat() + "Z"] = SPLIT_LOG_MARKER
-                gloss.logs = logs
-                storage.save_gloss(gloss)
-    elif action == "ai_generate":
-        provider, model = provider_model.split("|", 1) if "|" in provider_model else (provider_model, "")
-        if not selected_refs:
-            ai_error = "Select glosses to split."
-        elif provider != "OpenAI":
-            ai_error = "Only OpenAI is supported for now."
-        elif not settings.api_keys.openai:
-            ai_error = "OpenAI API key missing. Add it in Settings."
-        else:
-            ai_results = []
-            for ref in selected_refs:
+    if request.method == "POST":
+        if action == "mark_skip":
+            targets = selected_refs or ([target_ref] if target_ref and REF_PATTERN.match(target_ref) else [])
+            for ref in targets:
+                if not REF_PATTERN.match(ref):
+                    continue
                 gloss = storage.resolve_reference(ref)
-                if not gloss:
-                    continue
-                if not should_break_up(gloss):
-                    continue
-                result = generate_split(gloss, model, settings.api_keys.openai, context)
-                ai_results.append({
-                    "ref": f"{gloss.language}:{gloss.slug}",
-                    "content": gloss.content,
-                    "language": gloss.language,
-                    "parts": result.get("parts") or [],
-                    "error": result.get("error"),
-                })
+                if gloss:
+                    logs = gloss.logs if isinstance(getattr(gloss, "logs", {}), dict) else {}
+                    logs[datetime.utcnow().isoformat() + "Z"] = SPLIT_LOG_MARKER
+                    gloss.logs = logs
+                    storage.save_gloss(gloss)
+        elif action == "ai_generate":
+            provider, model = provider_model.split("|", 1) if "|" in provider_model else (provider_model, "")
+            if not selected_refs:
+                ai_error = "Select glosses to split."
+            elif provider != "OpenAI":
+                ai_error = "Only OpenAI is supported for now."
+            elif not settings.api_keys.openai:
+                ai_error = "OpenAI API key missing. Add it in Settings."
+            else:
+                ai_results = []
+                for ref in selected_refs:
+                    gloss = storage.resolve_reference(ref)
+                    if not gloss:
+                        continue
+                    if not should_break_up(gloss):
+                        continue
+                    result = generate_split(gloss, model, settings.api_keys.openai, context)
+                    ai_results.append({
+                        "ref": f"{gloss.language}:{gloss.slug}",
+                        "content": gloss.content,
+                        "language": gloss.language,
+                        "parts": result.get("parts") or [],
+                        "error": result.get("error"),
+                    })
+                if not ai_results:
+                    ai_error = "No eligible glosses found to split."
+        elif action in ("ai_accept_all", "ai_accept_selection"):
             if not ai_results:
-                ai_error = "No eligible glosses found to split."
-    elif action in ("ai_accept_all", "ai_accept_selection"):
-        if not ai_results:
-            ai_error = "No AI results to accept."
-        else:
-            added = 0
-            selection_map: dict[str, list[str]] = {}
-            if action == "ai_accept_selection":
-                for val in selected_parts:
-                    try:
-                        entry = json.loads(val)
-                    except Exception:
+                ai_error = "No AI results to accept."
+            else:
+                added = 0
+                selection_map: dict[str, list[str]] = {}
+                if action == "ai_accept_selection":
+                    for val in selected_parts:
+                        try:
+                            entry = json.loads(val)
+                        except Exception:
+                            continue
+                        if not isinstance(entry, dict):
+                            continue
+                        ref = entry.get("ref")
+                        part = entry.get("part")
+                        if not ref or not isinstance(part, str):
+                            continue
+                        selection_map.setdefault(ref, []).append(part)
+                for item in ai_results:
+                    ref = item.get("ref", "")
+                    if not REF_PATTERN.match(ref or ""):
                         continue
-                    if not isinstance(entry, dict):
+                    gloss = storage.resolve_reference(ref)
+                    if not gloss:
                         continue
-                    ref = entry.get("ref")
-                    part = entry.get("part")
-                    if not ref or not isinstance(part, str):
-                        continue
-                    selection_map.setdefault(ref, []).append(part)
-            for item in ai_results:
-                ref = item.get("ref", "")
-                if not REF_PATTERN.match(ref or ""):
-                    continue
-                gloss = storage.resolve_reference(ref)
-                if not gloss:
-                    continue
-                parts = item.get("parts") or []
-                chosen = parts if action == "ai_accept_all" else selection_map.get(ref, [])
-                for part_text in chosen:
-                    part_text = part_text.strip()
-                    if not part_text:
-                        continue
-                    part_gloss = storage.ensure_gloss(gloss.language, part_text)
-                    attach_relation(storage, gloss, "parts", part_gloss)
-                    added += 1
+                    parts = item.get("parts") or []
+                    chosen = parts if action == "ai_accept_all" else selection_map.get(ref, [])
+                    for part_text in chosen:
+                        part_text = part_text.strip()
+                        if not part_text:
+                            continue
+                        part_gloss = storage.ensure_gloss(gloss.language, part_text)
+                        attach_relation(storage, gloss, "parts", part_gloss)
+                        added += 1
+                ai_results = []
+                ai_message = f"Added {added} parts." if added else "No parts added."
+        elif action == "ai_discard":
             ai_results = []
-            ai_message = f"Added {added} parts." if added else "No parts added."
-    elif action == "ai_discard":
-        ai_results = []
 
     glosses: list = []
     seen: set[str] = set()

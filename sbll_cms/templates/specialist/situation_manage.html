@@ -51,7 +51,7 @@
     <div class="mt-4 card bg-base-100 shadow-md">
       <div class="card-body">
         <h2 class="card-title text-lg">Tool Links</h2>
-        <form method="post" action="{{ url_for('specialist.break_up_glosses') }}">
+        <form method="get" action="{{ url_for('specialist.break_up_glosses') }}">
           <input type="hidden" name="refs" value='{{ break_up_refs_json|safe }}' />
           <button class="btn btn-primary btn-sm" type="submit" {% if break_up_count == 0 %}disabled{% endif %}>
             Break up glosses with no parts ({{ break_up_count }})
