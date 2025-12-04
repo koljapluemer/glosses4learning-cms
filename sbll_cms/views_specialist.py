@@ -65,26 +65,26 @@ def manage_situation(language: str, slug: str):
             target_language=target_language,
         )
         tree_lines = render_tree(goal_nodes)
-        glosses_in_tree = collect_glosses(goal_nodes)
+        glosses_in_tree = collect_glosses_with_roles(goal_nodes)
         affected_refs = [
             f"{g.language}:{g.slug}"
-            for g in glosses_in_tree
+            for g, _roles in glosses_in_tree
             if g.slug and should_break_up(g)
         ]
         missing_translation_refs = [
             f"{g.language}:{g.slug}"
-            for g in glosses_in_tree
+            for g, _roles in glosses_in_tree
             if g.slug and should_translate_missing(g, native_language, target_language)
         ]
         missing_target_refs = [
             f"{g.language}:{g.slug}"
-            for g in glosses_in_tree
+            for g, _roles in glosses_in_tree
             if g.slug and should_translate_missing_into_target(g, native_language, target_language)
         ]
         missing_usage_refs = [
             f"{g.language}:{g.slug}"
-            for g in glosses_in_tree
-            if g.slug and should_add_usage_examples(g, target_language)
+            for g, roles in glosses_in_tree
+            if g.slug and should_add_usage_examples(g, target_language, roles)
         ]
 
     return render_template(
@@ -797,8 +797,10 @@ def should_translate_missing_into_target(gloss, native_language: str, target_lan
     return True
 
 
-def should_add_usage_examples(gloss, target_language: str) -> bool:
+def should_add_usage_examples(gloss, target_language: str, roles: set[str] | None = None) -> bool:
     if gloss.language != target_language:
+        return False
+    if roles and roles.issubset({"usage_part"}):
         return False
     tags = gloss.tags or []
     if "eng:paraphrase" in tags:
@@ -814,22 +816,22 @@ def should_add_usage_examples(gloss, target_language: str) -> bool:
     return True
 
 
-def collect_glosses(nodes):
-    seen: set[str] = set()
-    ordered = []
+def collect_glosses_with_roles(nodes):
+    seen: dict[str, set[str]] = {}
+    gloss_map: dict[str, object] = {}
 
     def walk(node_list):
         for node in node_list:
             gloss = node["gloss"]
+            role = node.get("role", "")
             ref = f"{gloss.language}:{gloss.slug or gloss.content}"
-            if ref not in seen:
-                seen.add(ref)
-                ordered.append(gloss)
+            gloss_map.setdefault(ref, gloss)
+            seen.setdefault(ref, set()).add(role)
             for child in node.get("children", []):
                 walk([child])
 
     walk(nodes)
-    return ordered
+    return [(gloss_map[ref], roles) for ref, roles in seen.items()]
 
 
 def parse_refs(raw: str) -> list[str]:
