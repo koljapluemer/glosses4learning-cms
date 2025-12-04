@@ -127,13 +127,13 @@
     <div class="flex gap-3 items-center">
       <button class="btn btn-primary" type="submit" name="next_action" value="stay">{{ 'Create' if mode == 'create' else 'Save changes' }}</button>
       <a class="btn btn-ghost" href="{{ url_for('glosses.index') }}">Cancel</a>
-      {% if gloss.slug %}
-        <form action="{{ url_for('glosses.delete_gloss', language=gloss.language, slug=gloss.slug) }}" method="post" onsubmit="return confirm('Delete this gloss?');">
-          <button class="btn " type="submit">Delete gloss</button>
-        </form>
-      {% endif %}
     </div>
   </form>
+  {% if gloss.slug %}
+    <form class="mt-3" action="{{ url_for('glosses.delete_gloss', language=gloss.language, slug=gloss.slug) }}" method="post" onsubmit="return confirm('Delete this gloss?');">
+      <button class="btn" type="submit">Delete gloss</button>
+    </form>
+  {% endif %}
 
   {% if languages %}
     <script>
