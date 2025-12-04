@@ -11,11 +11,11 @@
 
   <div class="card bg-base-100 shadow-md">
     <div class="card-body">
-      <form class="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end mb-4" method="get">
+      <form class="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end" method="get">
         <label class="form-control w-full">
           <div class="label"><span class="label-text text-xs uppercase">Native Language</span></div>
           <select name="native_language" class="select select-bordered select-sm">
-            <option value="">No filter</option>
+            <option value="">Select...</option>
             {% for lang in languages %}
               <option value="{{ lang.iso_code }}" {% if lang.iso_code == native_language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
             {% endfor %}
@@ -24,7 +24,7 @@
         <label class="form-control w-full">
           <div class="label"><span class="label-text text-xs uppercase">Target Language</span></div>
           <select name="target_language" class="select select-bordered select-sm">
-            <option value="">No filter</option>
+            <option value="">Select...</option>
             {% for lang in languages %}
               <option value="{{ lang.iso_code }}" {% if lang.iso_code == target_language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
             {% endfor %}
@@ -32,121 +32,18 @@
         </label>
         <button class="btn btn-sm btn-primary mt-1" type="submit">Apply</button>
       </form>
-
-      {% if tree_lines %}
-        <pre class="font-mono text-sm whitespace-pre-wrap leading-tight">{{ tree_lines|join('\n')|safe }}</pre>
-      {% else %}
-        <div class="alert">
-          <span>No goals or parts found for this situation.</span>
-        </div>
-      {% endif %}
     </div>
   </div>
 
-  {% if target_language %}
+  {% if native_language and target_language %}
     <div class="mt-4 card bg-base-100 shadow-md">
       <div class="card-body">
-        <h2 class="card-title text-lg">Translations into {{ target_language }}</h2>
-        {% if flat_glosses %}
-          <div class="overflow-x-auto">
-            <table class="table table-xs">
-              <thead>
-                <tr>
-                  <th>Gloss</th>
-                  <th>Translations</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for gloss in flat_glosses %}
-                  <tr>
-                    <td>
-                      <a class="link link-primary" target="_blank" href="{{ url_for('glosses.edit_gloss', language=gloss.language, slug=gloss.slug) }}">{{ gloss|paraphrase }}</a>
-                    </td>
-                    <td>
-                      {% set filtered = (gloss.translations or []) | filter_translations(target_language) %}
-                      {% if filtered %}
-                        {% for ref in filtered %}
-                          {% set parts = ref.split(':') %}
-                          {% set t_lang = parts[0] %}
-                          {% set t_slug = parts[1] %}
-                          {% set t_gloss = storage.resolve_reference(ref) %}
-                          <a class="link link-primary" target="_blank" href="{{ url_for('glosses.edit_gloss', language=t_lang, slug=t_slug) }}">{{ t_gloss.content if t_gloss else ref }}</a>{% if not loop.last %}, {% endif %}
-                        {% endfor %}
-                      {% else %}
-                        —
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
+        {% if tree_lines %}
+          <pre class="font-mono text-sm whitespace-pre-wrap leading-tight">{{ tree_lines|join('\n')|safe }}</pre>
         {% else %}
-          <div class="alert"><span>No glosses found in the tree.</span></div>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="mt-4 card bg-base-100 shadow-md">
-      <div class="card-body space-y-3">
-        <div class="flex items-center justify-between">
-          <h2 class="card-title text-lg">Auto-Translate Missing</h2>
-        </div>
-        <form method="post" class="flex flex-wrap gap-3 items-end">
-          <input type="hidden" name="action" value="generate_auto" />
-          <input type="hidden" name="target_language" value="{{ target_language }}" />
-          <input type="hidden" name="native_language" value="{{ native_language }}" />
-          <label class="form-control w-full md:w-64">
-            <div class="label"><span class="label-text text-xs uppercase">Model</span></div>
-            <select name="model" class="select select-bordered select-sm">
-              <option value="OpenAI|gpt-4o-mini" {% if model == "OpenAI|gpt-4o-mini" %}selected{% endif %}>OpenAI | gpt-4o-mini</option>
-              <option value="OpenAI|gpt-4.1" {% if model == "OpenAI|gpt-4.1" %}selected{% endif %}>OpenAI | gpt-4.1</option>
-            </select>
-          </label>
-          <button class="btn btn-primary btn-sm mt-1" type="submit">Auto-Translate Missing</button>
-        </form>
-
-        {% if auto_results %}
-          <form method="post" class="space-y-3">
-            <input type="hidden" name="action" value="accept_generated" />
-            <input type="hidden" name="target_language" value="{{ target_language }}" />
-            <input type="hidden" name="native_language" value="{{ native_language }}" />
-            <input type="hidden" name="generated_payload" value='{{ auto_results|tojson }}' />
-            <div class="overflow-x-auto">
-              <table class="table table-xs">
-                <thead>
-                  <tr>
-                    <th class="w-12"></th>
-                    <th>Gloss</th>
-                    <th>Translations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for item in auto_results %}
-                    <tr>
-                      <td>
-                        <input type="checkbox" name="selected_ref" value="{{ item.ref }}" class="checkbox checkbox-sm" checked />
-                      </td>
-                      <td>{{ item.content }}</td>
-                      <td>
-                        {% if item.error %}
-                          <span class="text-error">{{ item.error }}</span>
-                        {% elif item.translations %}
-                          {{ item.translations|join(', ') }}
-                        {% else %}
-                          —
-                        {% endif %}
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            <div class="flex gap-2">
-              <button class="btn btn-primary btn-sm" type="submit">Accept selected</button>
-              <a class="btn btn-ghost btn-sm" href="{{ url_for('specialist.manage_situation', language=situation.language, slug=situation.slug, target_language=target_language, native_language=native_language) }}">Discard</a>
-            </div>
-          </form>
+          <div class="alert">
+            <span>No matching goals found for these languages.</span>
+          </div>
         {% endif %}
       </div>
     </div>
