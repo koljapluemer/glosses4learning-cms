@@ -176,7 +176,7 @@ class GlossStorage:
 
     def search_glosses(self, query: str, language: str | None = None, limit: int = 10) -> list[Gloss]:
         query = (query or "").strip().lower()
-        language = normalize_language_code(language or "")
+        language = normalize_language_code(language) if language else ""
         if not query:
             return []
 
