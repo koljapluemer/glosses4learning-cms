@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 import json
 import re
+import io
+import zipfile
 
 import requests
 from markupsafe import Markup
-from flask import Blueprint, abort, render_template, request, current_app
+from flask import Blueprint, abort, render_template, request, current_app, send_file
 
 from .storage import get_storage
 from .language import get_language_store
@@ -86,7 +88,90 @@ def manage_situation(language: str, slug: str):
         missing_target_count=len(missing_target_refs),
         missing_usage_refs_json=json.dumps(missing_usage_refs),
         missing_usage_count=len(missing_usage_refs),
+        goal_nodes=goal_nodes if native_language and target_language else [],
+        glosses_to_learn=list(stats.get("glosses_to_learn", set())) if native_language and target_language else [],
     )
+
+
+@bp.route("/situations/<language>/<slug>/export", methods=["GET"])
+def export_situation(language: str, slug: str):
+    storage = get_storage()
+    situation = storage.load_gloss(language, slug)
+    if not situation:
+        abort(404)
+    target_language = (request.values.get("target_language") or "").strip().lower()
+    native_language = (request.values.get("native_language") or "").strip().lower()
+    if not target_language or not native_language:
+        abort(400, description="native_language and target_language are required")
+
+    goal_nodes, stats = build_goal_nodes(
+        situation,
+        storage=storage,
+        native_language=native_language,
+        target_language=target_language,
+    )
+
+    def node_ref(node):
+        gl = node["gloss"]
+        return f"{gl.language}:{gl.slug or gl.content}"
+
+    def gather_refs(root_node):
+        refs = []
+        learn_refs = []
+        seen = set()
+
+        def walk(n):
+            ref = node_ref(n)
+            if ref not in seen:
+                seen.add(ref)
+                refs.append(ref)
+            if n.get("bold") and ref != node_ref(root_node):
+                if ref not in learn_refs:
+                    learn_refs.append(ref)
+            for child in n.get("children", []):
+                walk(child)
+
+        walk(root_node)
+        return refs, learn_refs
+
+    export_obj = {
+        "procedural-paraphrase-expression-goals": [],
+        "understand-expression-goals": [],
+    }
+    all_refs: set[str] = set()
+
+    for root in goal_nodes:
+        goal_type = root.get("goal_type")
+        if goal_type not in ("procedural", "understand"):
+            continue
+        refs, learn_refs = gather_refs(root)
+        all_refs.update(refs)
+        payload = {
+            "finalChallenge": node_ref(root),
+            "needToBeLearned": learn_refs,
+            "references": refs,
+        }
+        if goal_type == "procedural":
+            export_obj["procedural-paraphrase-expression-goals"].append(payload)
+        else:
+            export_obj["understand-expression-goals"].append(payload)
+
+    jsonl_lines = []
+    for ref in all_refs:
+        gloss = storage.resolve_reference(ref)
+        if not gloss:
+            continue
+        item = gloss.to_dict()
+        item["ref"] = ref
+        jsonl_lines.append(json.dumps(item, ensure_ascii=False))
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("situation.json", json.dumps(export_obj, ensure_ascii=False, indent=2))
+        zf.writestr("glosses.jsonl", "\n".join(jsonl_lines))
+    buf.seek(0)
+    filename = f"{language}-{slug}-{native_language}-{target_language}-export.zip"
+    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=filename)
 
 
 def build_goal_nodes(situation, storage, native_language: str, target_language: str):
@@ -114,7 +199,7 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
     def has_translation(gl, lang: str) -> bool:
         return any(ref.startswith(f"{lang}:") for ref in (gl.translations or []))
 
-    def mark_stats(gl, usage_lineage: bool):
+    def mark_stats(gl, usage_lineage: bool, parts_line: bool, learn_lang: str):
         key = gloss_key(gl)
         stats["gloss_map"][key] = gl
         stats["situation_glosses"].add(key)
@@ -131,13 +216,16 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
             if not has_translation(gl, target_language) and not has_log(gl, f"{TRANSLATION_IMPOSSIBLE_MARKER}:{target_language}"):
                 stats["target_missing"].add(key)
 
+        if parts_line and gl.language == learn_lang:
+            stats["glosses_to_learn"].add(key)
+
         return {
             "warn_native_missing": key in stats["native_missing"],
             "warn_target_missing": key in stats["target_missing"],
             "warn_usage_missing": key in stats["usage_missing"],
         }
 
-    def build_node(gloss, role="root", marker="", usage_lineage=False, allow_translations=True, path=None):
+    def build_node(gloss, role="root", marker="", usage_lineage=False, allow_translations=True, path=None, parts_line=False, learn_lang=""):
         tags = gloss.tags or []
         if gloss.language == target_language and "eng:paraphrase" in tags:
             return None
@@ -147,13 +235,13 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
         already_seen = key in seen_keys
         seen_keys.add(key)
 
-        flags = mark_stats(gloss, usage_lineage)
+        flags = mark_stats(gloss, usage_lineage, parts_line, learn_lang)
 
         node = {
             "gloss": gloss,
             "children": [],
             "marker": marker,
-            "bold": role in ("root", "part", "usage_part"),
+            "bold": parts_line and gloss.language == learn_lang,
             "role": role,
             "warn_native_missing": flags["warn_native_missing"],
             "warn_target_missing": flags["warn_target_missing"],
@@ -180,6 +268,8 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
                 usage_lineage=usage_lineage,
                 allow_translations=True,
                 path=next_path,
+                parts_line=True,
+                learn_lang=learn_lang,
             )
             if part_node:
                 node["children"].append(part_node)
@@ -207,6 +297,8 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
                         usage_lineage=usage_lineage,
                         allow_translations=child_key not in seen_keys,
                         path=next_path,
+                        parts_line=False,
+                        learn_lang=learn_lang,
                     )
                     if t_node:
                         node["children"].append(t_node)
@@ -226,6 +318,8 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
                         usage_lineage=True,
                         allow_translations=child_key not in seen_keys,
                         path=next_path,
+                        parts_line=False,
+                        learn_lang=learn_lang,
                     )
                     if usage_node:
                         node["children"].append(usage_node)
@@ -240,8 +334,12 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
         marker = ""
         if gloss.language == native_language and "eng:procedural-paraphrase-expression-goal" in tags:
             marker = "⚙︎ "
+            learn_lang = native_language
+            goal_type = "procedural"
         elif gloss.language == target_language and "eng:understand-expression-goal" in tags:
             marker = "🗣 "
+            learn_lang = target_language
+            goal_type = "understand"
         else:
             continue
         node = build_node(
@@ -250,8 +348,11 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
             marker=marker,
             usage_lineage=False,
             allow_translations=True,
+            parts_line=True,
+            learn_lang=learn_lang,
         )
         if node:
+            node["goal_type"] = goal_type
             nodes.append(node)
     return nodes, stats
 

@@ -80,6 +80,13 @@
             Add usage examples ({{ missing_usage_count }})
           </button>
         </form>
+        <form class="mt-4" method="get" action="{{ url_for('specialist.export_situation', language=situation.language, slug=situation.slug) }}">
+          <input type="hidden" name="native_language" value="{{ native_language }}">
+          <input type="hidden" name="target_language" value="{{ target_language }}">
+          <button class="btn btn-outline btn-sm" type="submit" {% if not native_language or not target_language %}disabled{% endif %}>
+            Export situation as zip
+          </button>
+        </form>
       </div>
     </div>
   {% endif %}
