@@ -85,6 +85,8 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
         if not gloss:
             continue
         tags = gloss.tags or []
+        if gloss.language == target_language and "eng:paraphrase" in tags:
+            continue
         marker = ""
         if gloss.language == native_language and "eng:procedural-paraphrase-expression-goal" in tags:
             marker = "⚙︎ "
@@ -118,6 +120,10 @@ def build_tree_node(
     path = path or set()
     key = f"{gloss.language}:{gloss.slug or gloss.content}"
     node = {"gloss": gloss, "children": [], "marker": marker, "bold": role in ("part", "usage_part"), "role": role}
+
+    tags = gloss.tags or []
+    if gloss.language == target_language and "eng:paraphrase" in tags:
+        return None
 
     if key in path:
         return node
@@ -156,25 +162,7 @@ def build_tree_node(
                     continue
                 t_gloss = storage.resolve_reference(ref)
                 if t_gloss:
-                    node["children"].append(
-                        build_tree_node(
-                            t_gloss,
-                            storage=storage,
-                            native_language=native_language,
-                            target_language=target_language,
-                            role="translation",
-                            path=next_path,
-                        )
-                    )
-    elif role == "usage_part" and native_language:
-        for ref in gloss.translations or []:
-            ref_lang = ref.split(":", 1)[0].strip().lower()
-            if ref_lang != native_language.lower():
-                continue
-            t_gloss = storage.resolve_reference(ref)
-            if t_gloss:
-                node["children"].append(
-                    build_tree_node(
+                    t_node = build_tree_node(
                         t_gloss,
                         storage=storage,
                         native_language=native_language,
@@ -182,7 +170,25 @@ def build_tree_node(
                         role="translation",
                         path=next_path,
                     )
+                    if t_node:
+                        node["children"].append(t_node)
+    elif role == "usage_part" and native_language:
+        for ref in gloss.translations or []:
+            ref_lang = ref.split(":", 1)[0].strip().lower()
+            if ref_lang != native_language.lower():
+                continue
+            t_gloss = storage.resolve_reference(ref)
+            if t_gloss:
+                t_node = build_tree_node(
+                    t_gloss,
+                    storage=storage,
+                    native_language=native_language,
+                    target_language=target_language,
+                    role="translation",
+                    path=next_path,
                 )
+                if t_node:
+                    node["children"].append(t_node)
 
     if gloss.language == target_language:
         for u_ref in getattr(gloss, "usage_examples", []):
