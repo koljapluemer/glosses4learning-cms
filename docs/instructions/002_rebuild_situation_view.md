@@ -17,14 +17,23 @@ It's already quite nice, but we need the following changes:
 - On highest level, we want to show glosses that are fulfill any of these
     - they the selected native language and tagged `eng:procedural-paraphrase-expression-goal`. In the display, prepend them with "⚙︎"
     - they are in the selected target lang and tagged `eng:understand-expression-goal`. Prepend them with "🗣" in the view
-- Then, do the following bespoke, sometimes-recursive-sometimes-not resolve:
-    - for any gloss, native or target, recursively resolve `parts` (and attach as children and grandchildren and so on). write these in bold.
-    - for each of the glosses now in the list, show translations to the other language once more (so if a given gloss is in nat language, show its `translations` into target lang, and vice versa). Not in bold, not recursive.
-    - for each target lang gloss now existing resolve the `usageExamples` and append them as children, prepending with "🛠" 
-    - for each of the stuff added as usage example, recursively resolve `parts` and attach.
-    - For each of the glosses added as parts of usage examples, resolve `translations` into the native lang once and attach.
+- Maintain the following lists:
+    - `situationGlosses[]`: a reference to all glosses that are in the tree for any reason
+    - `glossesToLearn[]`: a list of glosses the learner will specifically have to learn and memorize; relevant later in the frontend. Only specific glosses by specific rules are added here. Displayed bold in the tree
+    - `nativeTranslationMissing[]`: target lang glosses that still require a translation into selected native lang. Have a little "⚠" AFTER their content in the tree.
+    - `targetTranslationMissing[]`: native lang glosses that still require a translation into selected target lang. Have a little "⚠" AFTER their content in the tree.
+    - `partsMissing[]`: any glosses of any of the two langs that may need to be split
+    - `usageExampleMissing[]`: target lang glosses that require usage examples. Have a little "🛠?" after their content in the tree.
+- Then, do the following bespoke resolve:
+    - from the top level goals, recursively resolve their `parts` (and attach as children and grandchildren and so on). 
+        - These are `glossesToLearn` throughout.
+    - generally recursively process `translations` in a mirrored way (for target lang gloss, attach `translations` that are into the native lang, and vice versa). 
+        - To prevent infinite recursion, check if a given gloss is already somewhere in the tree. If so, STILL ATTACH it, but then don't recurse into ITS translations any further.
+    - for any *target* lang gloss, also resursively resolve their `usageExamples`, pre-pending them with "🛠" (if they have none, into the `usageExampleMissing` list they go). However ONLY add `usageExamples` to a given gloss if this gloss has no (recursive) parent that is marked as `usageExample` with "🛠". As such, if one traces a leaf up the tree, there should only ever be zero or one glosses marked "🛠". Once "🛠" is in the "lineage", glosses neither display their `usageExamples` in the tree nor are there liable to be in the `usageExampleMissing` list. Apart from that, `usageExamples` should be recursively resolved along their `translations` and `parts` in the same way as everything else. 
+    - All the glosses in the tree are liable to be in the respective translationMissing list, if no relevant translations or no relevant log. Of course, we care about whether they actually *have* relevant translations, even if those are not shown in the tree due to recursion limit rule described above.
+    - All these glosses are liable to `partsMissing` if no log or `parts` elements
 
-Remove everything else from the page, it's now obsolete. Yes, REMOVE not "comment out" or "migrate".
+
 
 ### Tool Links
 

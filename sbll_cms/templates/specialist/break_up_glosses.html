@@ -14,7 +14,7 @@
       {% if glosses %}
         <form method="post" id="bulk-form">
           <input type="hidden" name="refs" value='{{ refs_json|safe }}' />
-          <input type="hidden" name="results_json" value='{{ ai_results_json|safe }}' />
+          <input type="hidden" name="results_json" value='{{ ai_results|tojson }}' />
           <div class="flex gap-2 mb-3">
             <button class="btn btn-xs" type="button" onclick="toggleAll(true)">Select all</button>
             <button class="btn btn-xs" type="button" onclick="toggleAll(false)">Deselect all</button>

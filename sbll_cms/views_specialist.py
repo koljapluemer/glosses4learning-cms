@@ -56,36 +56,20 @@ def manage_situation(language: str, slug: str):
     missing_translation_refs: list[str] = []
     missing_target_refs: list[str] = []
     missing_usage_refs: list[str] = []
+    stats = {}
 
     if native_language and target_language:
-        goal_nodes = build_goal_nodes(
+        goal_nodes, stats = build_goal_nodes(
             situation,
             storage=storage,
             native_language=native_language,
             target_language=target_language,
         )
         tree_lines = render_tree(goal_nodes)
-        glosses_in_tree = collect_glosses_with_roles(goal_nodes)
-        affected_refs = [
-            f"{g.language}:{g.slug}"
-            for g, _roles in glosses_in_tree
-            if g.slug and should_break_up(g)
-        ]
-        missing_translation_refs = [
-            f"{g.language}:{g.slug}"
-            for g, _roles in glosses_in_tree
-            if g.slug and should_translate_missing(g, native_language, target_language)
-        ]
-        missing_target_refs = [
-            f"{g.language}:{g.slug}"
-            for g, _roles in glosses_in_tree
-            if g.slug and should_translate_missing_into_target(g, native_language, target_language)
-        ]
-        missing_usage_refs = [
-            f"{g.language}:{g.slug}"
-            for g, roles in glosses_in_tree
-            if g.slug and should_add_usage_examples(g, target_language, roles)
-        ]
+        affected_refs = list(stats.get("parts_missing", set()))
+        missing_translation_refs = list(stats.get("native_missing", set()))
+        missing_target_refs = list(stats.get("target_missing", set()))
+        missing_usage_refs = list(stats.get("usage_missing", set()))
 
     return render_template(
         "specialist/situation_manage.html",
@@ -106,14 +90,153 @@ def manage_situation(language: str, slug: str):
 
 
 def build_goal_nodes(situation, storage, native_language: str, target_language: str):
+    stats = {
+        "situation_glosses": set(),
+        "glosses_to_learn": set(),
+        "native_missing": set(),
+        "target_missing": set(),
+        "parts_missing": set(),
+        "usage_missing": set(),
+        "gloss_map": {},
+    }
+    seen_keys: set[str] = set()
     nodes = []
+
+    def gloss_key(gl):
+        return f"{gl.language}:{gl.slug or gl.content}"
+
+    def has_log(gl, marker: str) -> bool:
+        logs = getattr(gl, "logs", {}) or {}
+        if not isinstance(logs, dict):
+            return False
+        return any(marker in str(val) for val in logs.values())
+
+    def has_translation(gl, lang: str) -> bool:
+        return any(ref.startswith(f"{lang}:") for ref in (gl.translations or []))
+
+    def mark_stats(gl, usage_lineage: bool):
+        key = gloss_key(gl)
+        stats["gloss_map"][key] = gl
+        stats["situation_glosses"].add(key)
+
+        if not (getattr(gl, "parts", None) or []) and not has_log(gl, SPLIT_LOG_MARKER):
+            stats["parts_missing"].add(key)
+
+        if gl.language == target_language:
+            if not has_translation(gl, native_language) and not has_log(gl, f"{TRANSLATION_IMPOSSIBLE_MARKER}:{native_language}"):
+                stats["native_missing"].add(key)
+            if not usage_lineage and not has_log(gl, f"{USAGE_IMPOSSIBLE_MARKER}:{target_language}") and not (gl.usage_examples or []):
+                stats["usage_missing"].add(key)
+        elif gl.language == native_language:
+            if not has_translation(gl, target_language) and not has_log(gl, f"{TRANSLATION_IMPOSSIBLE_MARKER}:{target_language}"):
+                stats["target_missing"].add(key)
+
+        return {
+            "warn_native_missing": key in stats["native_missing"],
+            "warn_target_missing": key in stats["target_missing"],
+            "warn_usage_missing": key in stats["usage_missing"],
+        }
+
+    def build_node(gloss, role="root", marker="", usage_lineage=False, allow_translations=True, path=None):
+        tags = gloss.tags or []
+        if gloss.language == target_language and "eng:paraphrase" in tags:
+            return None
+
+        path = set(path or [])
+        key = gloss_key(gloss)
+        already_seen = key in seen_keys
+        seen_keys.add(key)
+
+        flags = mark_stats(gloss, usage_lineage)
+
+        node = {
+            "gloss": gloss,
+            "children": [],
+            "marker": marker,
+            "bold": role in ("root", "part", "usage_part"),
+            "role": role,
+            "warn_native_missing": flags["warn_native_missing"],
+            "warn_target_missing": flags["warn_target_missing"],
+            "warn_usage_missing": flags["warn_usage_missing"],
+            "warn_parts_missing": key in stats["parts_missing"],
+        }
+
+        if key in path:
+            return node
+        next_path = set(path)
+        next_path.add(key)
+
+        if role in ("root", "part", "usage_part"):
+            stats["glosses_to_learn"].add(key)
+
+        # parts recursion
+        for part_ref in getattr(gloss, "parts", []):
+            part_gloss = storage.resolve_reference(part_ref)
+            if not part_gloss:
+                continue
+            part_node = build_node(
+                part_gloss,
+                role="usage_part" if role in ("usage", "usage_part") else "part",
+                usage_lineage=usage_lineage,
+                allow_translations=True,
+                path=next_path,
+            )
+            if part_node:
+                node["children"].append(part_node)
+
+        # translations
+        if allow_translations:
+            other_lang = None
+            if gloss.language == native_language and target_language:
+                other_lang = target_language
+            elif gloss.language == target_language and native_language:
+                other_lang = native_language
+            if other_lang:
+                for ref in gloss.translations or []:
+                    ref_lang = ref.split(":", 1)[0].strip().lower()
+                    if ref_lang != other_lang.lower():
+                        continue
+                    t_gloss = storage.resolve_reference(ref)
+                    if not t_gloss:
+                        continue
+                    child_key = gloss_key(t_gloss)
+                    t_node = build_node(
+                        t_gloss,
+                        role="translation",
+                        marker="",
+                        usage_lineage=usage_lineage,
+                        allow_translations=child_key not in seen_keys,
+                        path=next_path,
+                    )
+                    if t_node:
+                        node["children"].append(t_node)
+
+        # usage examples
+        if gloss.language == target_language and not usage_lineage:
+            if gloss.usage_examples:
+                for u_ref in getattr(gloss, "usage_examples", []):
+                    u_gloss = storage.resolve_reference(u_ref)
+                    if not u_gloss:
+                        continue
+                    child_key = gloss_key(u_gloss)
+                    usage_node = build_node(
+                        u_gloss,
+                        role="usage",
+                        marker="🛠 ",
+                        usage_lineage=True,
+                        allow_translations=child_key not in seen_keys,
+                        path=next_path,
+                    )
+                    if usage_node:
+                        node["children"].append(usage_node)
+
+        return node
+
     for ref in situation.children:
         gloss = storage.resolve_reference(ref)
         if not gloss:
             continue
         tags = gloss.tags or []
-        if gloss.language == target_language and "eng:paraphrase" in tags:
-            continue
         marker = ""
         if gloss.language == native_language and "eng:procedural-paraphrase-expression-goal" in tags:
             marker = "⚙︎ "
@@ -121,120 +244,16 @@ def build_goal_nodes(situation, storage, native_language: str, target_language: 
             marker = "🗣 "
         else:
             continue
-        node = build_tree_node(
+        node = build_node(
             gloss,
-            storage=storage,
-            native_language=native_language,
-            target_language=target_language,
             role="root",
             marker=marker,
-            path=set(),
+            usage_lineage=False,
+            allow_translations=True,
         )
         if node:
             nodes.append(node)
-    return nodes
-
-
-def build_tree_node(
-    gloss,
-    storage,
-    native_language: str,
-    target_language: str,
-    role: str = "root",
-    marker: str = "",
-    path: set[str] | None = None,
-):
-    path = path or set()
-    key = f"{gloss.language}:{gloss.slug or gloss.content}"
-    node = {"gloss": gloss, "children": [], "marker": marker, "bold": role in ("part", "usage_part"), "role": role}
-
-    tags = gloss.tags or []
-    if gloss.language == target_language and "eng:paraphrase" in tags:
-        return None
-
-    if key in path:
-        return node
-
-    next_path = set(path)
-    next_path.add(key)
-
-    if role in ("root", "part", "usage", "usage_part"):
-        for part_ref in getattr(gloss, "parts", []):
-            part_gloss = storage.resolve_reference(part_ref)
-            if not part_gloss:
-                continue
-            part_role = "usage_part" if role in ("usage", "usage_part") else "part"
-            part_node = build_tree_node(
-                part_gloss,
-                storage=storage,
-                native_language=native_language,
-                target_language=target_language,
-                role=part_role,
-                path=next_path,
-            )
-            if part_node:
-                part_node["bold"] = True
-                node["children"].append(part_node)
-
-    if role in ("root", "part"):
-        other_lang = None
-        if gloss.language == native_language and target_language:
-            other_lang = target_language
-        elif gloss.language == target_language and native_language:
-            other_lang = native_language
-        if other_lang:
-            for ref in gloss.translations or []:
-                ref_lang = ref.split(":", 1)[0].strip().lower()
-                if ref_lang != other_lang.lower():
-                    continue
-                t_gloss = storage.resolve_reference(ref)
-                if t_gloss:
-                    t_node = build_tree_node(
-                        t_gloss,
-                        storage=storage,
-                        native_language=native_language,
-                        target_language=target_language,
-                        role="translation",
-                        path=next_path,
-                    )
-                    if t_node:
-                        node["children"].append(t_node)
-    elif role == "usage_part" and native_language:
-        for ref in gloss.translations or []:
-            ref_lang = ref.split(":", 1)[0].strip().lower()
-            if ref_lang != native_language.lower():
-                continue
-            t_gloss = storage.resolve_reference(ref)
-            if t_gloss:
-                t_node = build_tree_node(
-                    t_gloss,
-                    storage=storage,
-                    native_language=native_language,
-                    target_language=target_language,
-                    role="translation",
-                    path=next_path,
-                )
-                if t_node:
-                    node["children"].append(t_node)
-
-    if gloss.language == target_language:
-        for u_ref in getattr(gloss, "usage_examples", []):
-            u_gloss = storage.resolve_reference(u_ref)
-            if not u_gloss:
-                continue
-            usage_node = build_tree_node(
-                u_gloss,
-                storage=storage,
-                native_language=native_language,
-                target_language=target_language,
-                role="usage",
-                marker="🛠 ",
-                path=next_path,
-            )
-            if usage_node:
-                node["children"].append(usage_node)
-
-    return node
+    return nodes, stats
 
 
 def render_tree(nodes):
@@ -245,7 +264,14 @@ def render_tree(nodes):
         text = paraphrase_display(gloss)
         slug = gloss.slug or ""
         url = f"/glosses/{gloss.language}/{slug}/edit"
-        content = f'<a class="link link-primary" target="_blank" href="{url}">{text}</a>'
+        markers_after = ""
+        if node.get("warn_native_missing") or node.get("warn_target_missing"):
+            markers_after += " ⚠"
+        if node.get("warn_usage_missing"):
+            markers_after += " 🛠?"
+        if node.get("warn_parts_missing"):
+            markers_after += " ⫼?"
+        content = f'<a class="link link-primary" target="_blank" href="{url}">{text}</a>{markers_after}'
         if node.get("bold"):
             content = f"<strong>{content}</strong>"
         return Markup(content)
@@ -814,24 +840,6 @@ def should_add_usage_examples(gloss, target_language: str, roles: set[str] | Non
         if blocked:
             return False
     return True
-
-
-def collect_glosses_with_roles(nodes):
-    seen: dict[str, set[str]] = {}
-    gloss_map: dict[str, object] = {}
-
-    def walk(node_list):
-        for node in node_list:
-            gloss = node["gloss"]
-            role = node.get("role", "")
-            ref = f"{gloss.language}:{gloss.slug or gloss.content}"
-            gloss_map.setdefault(ref, gloss)
-            seen.setdefault(ref, set()).add(role)
-            for child in node.get("children", []):
-                walk([child])
-
-    walk(nodes)
-    return [(gloss_map[ref], roles) for ref, roles in seen.items()]
 
 
 def parse_refs(raw: str) -> list[str]:
