@@ -53,6 +53,7 @@ def manage_situation(language: str, slug: str):
     tree_lines: list[str] = []
     affected_refs: list[str] = []
     missing_translation_refs: list[str] = []
+    missing_target_refs: list[str] = []
 
     if native_language and target_language:
         goal_nodes = build_goal_nodes(
@@ -73,6 +74,11 @@ def manage_situation(language: str, slug: str):
             for g in glosses_in_tree
             if g.slug and should_translate_missing(g, native_language, target_language)
         ]
+        missing_target_refs = [
+            f"{g.language}:{g.slug}"
+            for g in glosses_in_tree
+            if g.slug and should_translate_missing_into_target(g, native_language, target_language)
+        ]
 
     return render_template(
         "specialist/situation_manage.html",
@@ -85,6 +91,8 @@ def manage_situation(language: str, slug: str):
         break_up_count=len(affected_refs),
         missing_translation_refs_json=json.dumps(missing_translation_refs),
         missing_translation_count=len(missing_translation_refs),
+        missing_target_refs_json=json.dumps(missing_target_refs),
+        missing_target_count=len(missing_target_refs),
     )
 
 
@@ -493,6 +501,133 @@ def missing_translations_tool():
     )
 
 
+@bp.route("/situations/tools/missing-target-translations", methods=["GET", "POST"])
+def missing_target_translations_tool():
+    storage = get_storage()
+    refs_raw = request.values.get("refs") or "[]"
+    native_language = (request.values.get("native_language") or "").strip().lower()
+    target_language = (request.values.get("target_language") or "").strip().lower()
+    action = (request.form.get("action") or "").strip()
+    selected_refs = [r.strip() for r in (request.form.getlist("selected_ref") or []) if r.strip() and REF_PATTERN.match(r.strip())]
+    selected_translations = [t for t in (request.form.getlist("selected_translation") or []) if t.strip()]
+    provider_model = request.form.get("provider_model") or "OpenAI|gpt-4o-mini"
+    context = request.form.get("context") or ""
+    results_raw = request.form.get("results_json") or "[]"
+    ai_results = parse_translation_results(results_raw)
+    ai_error = None
+    ai_message = None
+    settings = current_app.extensions["settings_store"].load()
+    refs = parse_refs(refs_raw)
+
+    glosses: list = []
+    seen: set[str] = set()
+    if native_language and target_language:
+        for ref in refs:
+            if ref in seen:
+                continue
+            seen.add(ref)
+            gloss = storage.resolve_reference(ref)
+            if gloss and should_translate_missing_into_target(gloss, native_language, target_language):
+                glosses.append(gloss)
+
+    if request.method == "POST":
+        if not native_language or not target_language:
+            ai_error = "Both native_language and target_language are required."
+        elif action == "mark_impossible":
+            for ref in selected_refs:
+                gloss = storage.resolve_reference(ref)
+                if gloss:
+                    logs = gloss.logs if isinstance(getattr(gloss, "logs", {}), dict) else {}
+                    logs[datetime.utcnow().isoformat() + "Z"] = f"{TRANSLATION_IMPOSSIBLE_MARKER}:{target_language}"
+                    gloss.logs = logs
+                    storage.save_gloss(gloss)
+            glosses = [g for g in glosses if should_translate_missing_into_target(g, native_language, target_language)]
+        elif action == "ai_generate":
+            provider, model = provider_model.split("|", 1) if "|" in provider_model else (provider_model, "")
+            if not selected_refs:
+                ai_error = "Select glosses to translate."
+            elif provider != "OpenAI":
+                ai_error = "Only OpenAI is supported for now."
+            elif not settings.api_keys.openai:
+                ai_error = "OpenAI API key missing. Add it in Settings."
+            else:
+                ai_results = []
+                for ref in selected_refs:
+                    gloss = storage.resolve_reference(ref)
+                    if not gloss or not should_translate_missing_into_target(gloss, native_language, target_language):
+                        continue
+                    req = TranslationRequest(
+                        gloss=gloss,
+                        target_language=target_language,
+                        provider=provider,
+                        model=model,
+                        context=context,
+                    )
+                    result = translate(req, settings, get_language_store())
+                    ai_results.append({
+                        "ref": f"{gloss.language}:{gloss.slug}",
+                        "content": gloss.content,
+                        "language": gloss.language,
+                        "translations": result.translations or [],
+                        "error": result.error,
+                    })
+                if not ai_results:
+                    ai_error = "No eligible glosses found to translate."
+        elif action in ("ai_accept_all", "ai_accept_selection"):
+            if not ai_results:
+                ai_error = "No AI results to accept."
+            else:
+                added = 0
+                selection_map: dict[str, list[str]] = {}
+                if action == "ai_accept_selection":
+                    for val in selected_translations:
+                        try:
+                            entry = json.loads(val)
+                        except Exception:
+                            continue
+                        if not isinstance(entry, dict):
+                            continue
+                        ref = entry.get("ref")
+                        translation = entry.get("translation")
+                        if not ref or not isinstance(translation, str):
+                            continue
+                        selection_map.setdefault(ref, []).append(translation)
+                for item in ai_results:
+                    ref = item.get("ref", "")
+                    if not REF_PATTERN.match(ref or ""):
+                        continue
+                    gloss = storage.resolve_reference(ref)
+                    if not gloss:
+                        continue
+                    translations = item.get("translations") or []
+                    chosen = translations if action == "ai_accept_all" else selection_map.get(ref, [])
+                    for t_text in chosen:
+                        t_text = t_text.strip()
+                        if not t_text:
+                            continue
+                        target = storage.ensure_gloss(target_language, t_text)
+                        attach_relation(storage, gloss, "translations", target)
+                        added += 1
+                ai_results = []
+                ai_message = f"Added {added} translations." if added else "No translations added."
+        elif action == "ai_discard":
+            ai_results = []
+
+    return render_template(
+        "specialist/missing_target_translations.html",
+        glosses=glosses,
+        refs_json=json.dumps(refs),
+        provider_model=provider_model,
+        context=context,
+        ai_results=ai_results,
+        ai_results_json=json.dumps(ai_results),
+        ai_error=ai_error,
+        ai_message=ai_message,
+        native_language=native_language,
+        target_language=target_language,
+    )
+
+
 def should_break_up(gloss) -> bool:
     no_parts = not (getattr(gloss, "parts", None) or [])
     logs = getattr(gloss, "logs", {}) or {}
@@ -515,6 +650,21 @@ def should_translate_missing(gloss, native_language: str, target_language: str) 
     logs = getattr(gloss, "logs", {}) or {}
     if isinstance(logs, dict):
         blocked = any(f"{TRANSLATION_IMPOSSIBLE_MARKER}:{native_language}" in str(val) for val in logs.values())
+        if blocked:
+            return False
+    return True
+
+
+def should_translate_missing_into_target(gloss, native_language: str, target_language: str) -> bool:
+    if gloss.language != native_language:
+        return False
+    translations = gloss.translations or []
+    has_target = any(ref.startswith(f"{target_language}:") for ref in translations)
+    if has_target:
+        return False
+    logs = getattr(gloss, "logs", {}) or {}
+    if isinstance(logs, dict):
+        blocked = any(f"{TRANSLATION_IMPOSSIBLE_MARKER}:{target_language}" in str(val) for val in logs.values())
         if blocked:
             return False
     return True

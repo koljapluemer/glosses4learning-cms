@@ -65,6 +65,14 @@
             Fill missing translations ({{ missing_translation_count }})
           </button>
         </form>
+        <form class="mt-2" method="get" action="{{ url_for('specialist.missing_target_translations_tool') }}" target="_blank">
+          <input type="hidden" name="refs" value='{{ missing_target_refs_json|safe }}' />
+          <input type="hidden" name="native_language" value="{{ native_language }}" />
+          <input type="hidden" name="target_language" value="{{ target_language }}" />
+          <button class="btn btn-sm" type="submit" {% if missing_target_count == 0 %}disabled{% endif %}>
+            Fill target translations ({{ missing_target_count }})
+          </button>
+        </form>
       </div>
     </div>
   {% endif %}
