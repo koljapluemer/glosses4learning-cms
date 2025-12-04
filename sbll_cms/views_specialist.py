@@ -140,6 +140,12 @@ def export_situation(language: str, slug: str):
     }
     all_refs: set[str] = set()
 
+    # include situation gloss and translations into selected languages
+    all_refs.add(f"{situation.language}:{situation.slug}")
+    for ref in situation.translations or []:
+        if ref.startswith(f"{native_language}:") or ref.startswith(f"{target_language}:"):
+            all_refs.add(ref)
+
     for root in goal_nodes:
         goal_type = root.get("goal_type")
         if goal_type not in ("procedural", "understand"):
