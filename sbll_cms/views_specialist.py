@@ -232,15 +232,18 @@ def break_up_glosses():
     refs_raw = request.form.get("refs") or "[]"
     action = (request.form.get("action") or "").strip()
     target_ref = (request.form.get("ref") or "").strip()
+    selected_refs = [r for r in (request.form.getlist("selected_ref") or []) if r.strip()]
     refs = parse_refs(refs_raw)
 
-    if action == "mark_skip" and target_ref:
-        gloss = storage.resolve_reference(target_ref)
-        if gloss:
-            logs = gloss.logs if isinstance(getattr(gloss, "logs", {}), dict) else {}
-            logs[datetime.utcnow().isoformat() + "Z"] = SPLIT_LOG_MARKER
-            gloss.logs = logs
-            storage.save_gloss(gloss)
+    if action == "mark_skip":
+        targets = selected_refs or ([target_ref] if target_ref else [])
+        for ref in targets:
+            gloss = storage.resolve_reference(ref)
+            if gloss:
+                logs = gloss.logs if isinstance(getattr(gloss, "logs", {}), dict) else {}
+                logs[datetime.utcnow().isoformat() + "Z"] = SPLIT_LOG_MARKER
+                gloss.logs = logs
+                storage.save_gloss(gloss)
 
     glosses: list = []
     seen: set[str] = set()
