@@ -12,3 +12,4 @@ wheels/
 # Local data
 data/gloss/**
 !data/gloss/.gitkeep
+data/settings.json
