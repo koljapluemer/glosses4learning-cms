@@ -6,6 +6,9 @@
       <h1 class="text-2xl font-bold">Situation Management</h1>
       <p class="text-sm text-base-content/70">Glosses tagged with "situation".</p>
     </div>
+    <a href="{{ url_for('specialist.batch_export_situations') }}" class="btn btn-primary btn-sm">
+      Batch Export All
+    </a>
   </div>
 
   {% if glosses %}

@@ -93,23 +93,23 @@ def manage_situation(language: str, slug: str):
     )
 
 
-@bp.route("/situations/<language>/<slug>/export", methods=["GET"])
-def export_situation(language: str, slug: str):
-    storage = get_storage()
-    situation = storage.load_gloss(language, slug)
-    if not situation:
-        abort(404)
-    target_language = (request.values.get("target_language") or "").strip().lower()
-    native_language = (request.values.get("native_language") or "").strip().lower()
-    if not target_language or not native_language:
-        abort(400, description="native_language and target_language are required")
+def create_situation_export_zip(situation, storage, native_language: str, target_language: str):
+    """
+    Create a ZIP export for a single situation/language pair.
 
+    Returns:
+        tuple: (zip_buffer, stats) where zip_buffer is None if no learnable content exists
+    """
     goal_nodes, stats = build_goal_nodes(
         situation,
         storage=storage,
         native_language=native_language,
         target_language=target_language,
     )
+
+    # Return None if no goals (skip condition)
+    if not goal_nodes:
+        return None, stats
 
     def node_ref(node):
         gl = node["gloss"]
@@ -176,8 +176,196 @@ def export_situation(language: str, slug: str):
         zf.writestr("situation.json", json.dumps(export_obj, ensure_ascii=False, indent=2))
         zf.writestr("glosses.jsonl", "\n".join(jsonl_lines))
     buf.seek(0)
+
+    # Calculate stats for reporting
+    stats["goal_count"] = len(goal_nodes)
+    stats["gloss_count"] = len(all_refs)
+
+    return buf, stats
+
+
+@bp.route("/situations/<language>/<slug>/export", methods=["GET"])
+def export_situation(language: str, slug: str):
+    storage = get_storage()
+    situation = storage.load_gloss(language, slug)
+    if not situation:
+        abort(404)
+    target_language = (request.values.get("target_language") or "").strip().lower()
+    native_language = (request.values.get("native_language") or "").strip().lower()
+    if not target_language or not native_language:
+        abort(400, description="native_language and target_language are required")
+
+    zip_buffer, stats = create_situation_export_zip(situation, storage, native_language, target_language)
+
+    if zip_buffer is None:
+        abort(400, description="No learnable content for this language pair")
+
     filename = f"{language}-{slug}-{native_language}-{target_language}-export.zip"
-    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=filename)
+    return send_file(zip_buffer, mimetype="application/zip", as_attachment=True, download_name=filename)
+
+
+def perform_batch_export(storage, language_store, output_root):
+    """
+    Export all situations for all language pairs to disk.
+
+    Returns dict with: success, total_situations, total_exports, exports[], skipped[], error
+    Raises: Any exception (fail fast)
+    """
+    from pathlib import Path
+
+    result = {
+        "success": False,
+        "total_situations": 0,
+        "total_exports": 0,
+        "exports": [],
+        "skipped": [],
+        "error": None,
+    }
+
+    try:
+        # Find all situations (glosses tagged with "eng:situation")
+        situations = []
+        for g in storage.list_glosses():
+            tags = g.tags or []
+            if any(t == "eng:situation" for t in tags):
+                situations.append(g)
+
+        result["total_situations"] = len(situations)
+
+        if not situations:
+            result["success"] = True
+            return result
+
+        # Get all languages
+        languages = language_store.list_languages()
+        if len(languages) < 2:
+            result["error"] = "Need at least 2 configured languages"
+            return result
+
+        # Process each situation × language pair
+        for situation in situations:
+            for native_lang in languages:
+                for target_lang in languages:
+                    if native_lang.iso_code == target_lang.iso_code:
+                        continue
+
+                    # Build goal nodes to get export data
+                    goal_nodes, stats = build_goal_nodes(
+                        situation, storage=storage,
+                        native_language=native_lang.iso_code,
+                        target_language=target_lang.iso_code
+                    )
+
+                    # Skip if no learnable content
+                    if not goal_nodes:
+                        result["skipped"].append({
+                            "situation": f"{situation.language}:{situation.slug}",
+                            "native": native_lang.iso_code,
+                            "target": target_lang.iso_code,
+                            "reason": "No learnable content",
+                        })
+                        continue
+
+                    # Helper functions for building export data
+                    def node_ref(node):
+                        gl = node["gloss"]
+                        return f"{gl.language}:{gl.slug or gl.content}"
+
+                    def gather_refs(root_node):
+                        refs = []
+                        learn_refs = []
+                        seen = set()
+
+                        def walk(n):
+                            ref = node_ref(n)
+                            if ref not in seen:
+                                seen.add(ref)
+                                refs.append(ref)
+                            if n.get("bold") and ref != node_ref(root_node):
+                                if ref not in learn_refs:
+                                    learn_refs.append(ref)
+                            for child in n.get("children", []):
+                                walk(child)
+
+                        walk(root_node)
+                        return refs, learn_refs
+
+                    # Build export object
+                    export_obj = {
+                        "procedural-paraphrase-expression-goals": [],
+                        "understand-expression-goals": [],
+                    }
+                    all_refs: set[str] = set()
+
+                    # Include situation gloss and translations
+                    all_refs.add(f"{situation.language}:{situation.slug}")
+                    for ref in situation.translations or []:
+                        if ref.startswith(f"{native_lang.iso_code}:") or ref.startswith(f"{target_lang.iso_code}:"):
+                            all_refs.add(ref)
+
+                    for root in goal_nodes:
+                        goal_type = root.get("goal_type")
+                        if goal_type not in ("procedural", "understand"):
+                            continue
+                        refs, learn_refs = gather_refs(root)
+                        all_refs.update(refs)
+                        payload = {
+                            "finalChallenge": node_ref(root),
+                            "needToBeLearned": learn_refs,
+                            "references": refs,
+                        }
+                        if goal_type == "procedural":
+                            export_obj["procedural-paraphrase-expression-goals"].append(payload)
+                        else:
+                            export_obj["understand-expression-goals"].append(payload)
+
+                    # Collect glosses
+                    jsonl_lines = []
+                    for ref in all_refs:
+                        gloss = storage.resolve_reference(ref)
+                        if not gloss:
+                            continue
+                        item = gloss.to_dict()
+                        item["ref"] = ref
+                        jsonl_lines.append(json.dumps(item, ensure_ascii=False))
+
+                    # Build output directory: situations/{native}/{target}/
+                    output_dir = Path(output_root) / native_lang.iso_code / target_lang.iso_code
+                    output_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Use situation content for filename
+                    base_filename = situation.content
+
+                    # Write situation.json
+                    situation_json_path = output_dir / f"{base_filename}.json"
+                    with situation_json_path.open("w", encoding="utf-8") as f:
+                        json.dump(export_obj, f, ensure_ascii=False, indent=2)
+
+                    # Write glosses.jsonl
+                    glosses_jsonl_path = output_dir / f"{base_filename}.jsonl"
+                    with glosses_jsonl_path.open("w", encoding="utf-8") as f:
+                        f.write("\n".join(jsonl_lines))
+
+                    result["exports"].append({
+                        "situation": f"{situation.language}:{situation.slug}",
+                        "native": native_lang.iso_code,
+                        "target": target_lang.iso_code,
+                        "situation_json": str(situation_json_path),
+                        "glosses_jsonl": str(glosses_jsonl_path),
+                        "stats": {
+                            "goal_count": len(goal_nodes),
+                            "gloss_count": len(all_refs),
+                        },
+                    })
+                    result["total_exports"] += 1
+
+        result["success"] = True
+        return result
+
+    except Exception as e:
+        result["error"] = str(e)
+        result["success"] = False
+        raise  # Fail fast
 
 
 def build_goal_nodes(situation, storage, native_language: str, target_language: str):
@@ -885,6 +1073,56 @@ def missing_usage_examples_tool():
         ai_error=ai_error,
         ai_message=ai_message,
         target_language=target_language,
+    )
+
+
+@bp.route("/situations/batch-export", methods=["GET", "POST"])
+def batch_export_situations():
+    """Batch export all situations for all language pairs."""
+    storage = get_storage()
+    language_store = get_language_store()
+
+    if request.method == "GET":
+        # Preview page: show what will be exported
+        situations = []
+        for g in storage.list_glosses():
+            tags = g.tags or []
+            if any(t == "eng:situation" for t in tags):
+                situations.append(g)
+
+        languages = language_store.list_languages()
+
+        pairs_per_situation = len(languages) * (len(languages) - 1) if len(languages) >= 2 else 0
+        max_exports = len(situations) * pairs_per_situation
+
+        return render_template(
+            "specialist/batch_export.html",
+            situations=situations,
+            languages=languages,
+            pairs_per_situation=pairs_per_situation,
+            max_exports=max_exports,
+        )
+
+    # POST: Execute batch export
+    project_root = current_app.config["DATA_ROOT"].parent
+    output_root = project_root / "situations"
+
+    try:
+        result = perform_batch_export(storage, language_store, output_root)
+    except Exception as e:
+        result = {
+            "success": False,
+            "error": str(e),
+            "total_situations": 0,
+            "total_exports": 0,
+            "exports": [],
+            "skipped": [],
+        }
+
+    return render_template(
+        "specialist/batch_export_result.html",
+        result=result,
+        output_root=str(output_root),
     )
 
 
