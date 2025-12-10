@@ -8,3 +8,18 @@ wheels/
 
 # Virtual environments
 .venv
+
+
+# Notebook artifacts
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Local secrets/config
+.env
+.env.*
+.envrc
+
+# Editor cruft
+.vscode/
+.idea/
+.DS_Store
