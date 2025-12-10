@@ -29,10 +29,14 @@ templates/
 |- routes/ # one entry in views/ should correspond to one folder here
 |- gloss_new/form.html # ...or whatever
 |- tool_translation/ # tools have a standardized file structure
-|   |- link_to.html # a standardized link button to this tool
+|   |- link_to_manual.html # a standardized link button to this tool
+|   |- link_to_auto.html # a standardized link button to this tool
 |   |- input_form.html # here the user can set inputs such as which AI model or extra notes. Tools should now always live on their own routes, NOT inline. make this a stub when not reasonably implementable.
 |   |- output_form.html # either just a confirmation of whatever was done, or the typical checklists of what to accept.  make this a stub when not reasonably implementable.
 |   |- manual.html # letting the user do the tool manually (e.g. manually add translations).  make this a stub when not reasonably implementable.
 |- tool_add_missing_usage_examples/ # same file-sub-structure 
 |- partials/ # only stuff that is not tools, and actually, right now, reused across the codebase
 ```
+
+
+

@@ -13,6 +13,13 @@ uv run flask --app sbll_cms run --debug
 
 Then open http://127.0.0.1:5000.
 
+Tk tooling (standalone)
+-----------------------
+
+Small Tk helper scripts live in `tools_tk/` and work directly on the same `data/` files:
+
+- `uv run python tools_tk/scripts/view_situation_tree.py` — pick a situation/native/target and view the goal tree + missing counts. Remembers your last selection in `tools_tk/shared/state.json` (gitignored).
+
 Notes
 -----
 

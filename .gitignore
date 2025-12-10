@@ -9,6 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+# TK tool state
+tools_tk/shared/state.json
+tools_tk/shared/settings.json
+
 
 # Notebook artifacts
 .ipynb_checkpoints/
