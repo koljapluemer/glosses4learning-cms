@@ -1,0 +1,8 @@
+{% extends "layout.html" %}
+{% set title = "Translation Comparison – input" %}
+{% block content %}
+  <div class="alert alert-info">
+    <span>No automated inputs for this tool yet. Continue to manual flow.</span>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('tools.translation_comparison_output', language=base.language, slug=base.slug, target_language=target_language) }}">Continue</a>
+{% endblock %}

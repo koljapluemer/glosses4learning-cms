@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% set title = "Translation Tool – input" %}
+{% block content %}
+  <div class="mb-4">
+    <h1 class="text-2xl font-bold">Translation Tool</h1>
+    <p class="text-sm text-base-content/70">{{ gloss.language }} → select target</p>
+  </div>
+  <form method="post" action="{{ url_for('tools.translation_tool_output', language=gloss.language, slug=gloss.slug) }}" class="space-y-4">
+    <div class="grid md:grid-cols-2 gap-4">
+      <label class="form-control">
+        <div class="label"><span class="label-text font-semibold">Target language</span></div>
+        <select name="target_language" class="select select-bordered" required>
+          {% for lang in languages %}
+            <option value="{{ lang.iso_code }}">{{ lang.symbol }} — {{ lang.display_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="form-control">
+        <div class="label"><span class="label-text font-semibold">Provider &amp; Model</span></div>
+        <select name="provider_model" class="select select-bordered">
+          <option value="OpenAI|gpt-4o-mini" {% if provider_model == "OpenAI|gpt-4o-mini" %}selected{% endif %}>OpenAI | gpt-4o-mini</option>
+          <option value="OpenAI|gpt-4.1" {% if provider_model == "OpenAI|gpt-4.1" %}selected{% endif %}>OpenAI | gpt-4.1</option>
+        </select>
+      </label>
+    </div>
+    <label class="form-control">
+      <div class="label"><span class="label-text font-semibold">Context (optional)</span></div>
+      <textarea name="context" class="textarea textarea-bordered" rows="3" placeholder="e.g., polite form, noun not verb">{{ context }}</textarea>
+    </label>
+    <div class="flex gap-2 justify-end">
+      <a class="btn" href="{{ url_for('glosses.edit_gloss', language=gloss.language, slug=gloss.slug) }}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Generate</button>
+    </div>
+  </form>
+{% endblock %}

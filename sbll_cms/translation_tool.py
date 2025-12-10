@@ -6,8 +6,8 @@ from typing import Any
 
 import requests
 
-from .gloss import Gloss
-from .language import LanguageStore
+from sbll_cms.entities.gloss import Gloss
+from sbll_cms.entities.language import LanguageStore
 from .settings import Settings
 
 

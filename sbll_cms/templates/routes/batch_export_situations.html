@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+{% set title = "Batch Export Situations" %}
+{% block content %}
+  <div class="mb-4">
+    <h1 class="text-2xl font-bold">Batch Export All Situations</h1>
+    <p class="text-sm text-base-content/70">Export all situations for all language pairs to situations/ directory.</p>
+  </div>
+
+  {% if situations|length == 0 %}
+    <div class="alert alert-warning">
+      <span>No situations found. Tag glosses with "eng:situation" to export them.</span>
+    </div>
+  {% elif languages|length < 2 %}
+    <div class="alert alert-error">
+      <span>Need at least 2 configured languages. Currently have {{ languages|length }}.</span>
+    </div>
+  {% else %}
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body">
+        <h2 class="card-title">Export Preview</h2>
+        <div class="stats stats-vertical lg:stats-horizontal shadow">
+          <div class="stat">
+            <div class="stat-title">Situations</div>
+            <div class="stat-value text-primary">{{ situations|length }}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title">Languages</div>
+            <div class="stat-value text-secondary">{{ languages|length }}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title">Pairs per Situation</div>
+            <div class="stat-value">{{ pairs_per_situation }}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title">Max Possible Exports</div>
+            <div class="stat-value text-accent">{{ max_exports }}</div>
+            <div class="stat-desc">Some may be skipped if no content</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <h3 class="font-bold mb-2">Situations to Export:</h3>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          {% for situation in situations %}
+            <li>{{ situation|paraphrase }} <span class="text-xs opacity-60">({{ situation.language }}:{{ situation.slug }})</span></li>
+          {% endfor %}
+        </ul>
+
+        <div class="divider"></div>
+
+        <h3 class="font-bold mb-2">Language Pairs:</h3>
+        <div class="text-sm">
+          {% for native in languages %}
+            {% for target in languages %}
+              {% if native.iso_code != target.iso_code %}
+                <span class="badge badge-sm mr-1 mb-1">{{ native.iso_code }} → {{ target.iso_code }}</span>
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="alert alert-info">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <div>
+            <h3 class="font-bold">Output Location</h3>
+            <div class="text-xs">Files will be written to: <code>situations/{native_iso}/{target_iso}/</code></div>
+            <div class="text-xs mt-1">Each export creates: <code>{situation}.json</code> and <code>{situation}.jsonl</code></div>
+            <div class="text-xs mt-1">Language pairs with no learnable content will be skipped automatically.</div>
+          </div>
+        </div>
+
+        <div class="card-actions justify-end mt-4">
+          <a href="{{ url_for('situations.list_situations') }}" class="btn btn-ghost">Cancel</a>
+          <form method="post">
+            <button type="submit" class="btn btn-primary">Start Batch Export</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

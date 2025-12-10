@@ -18,7 +18,7 @@
       {% if field == 'translations' and lang_groups %}
         <div class="flex flex-wrap gap-2 mb-2">
           {% for iso, count in lang_groups.items() %}
-            <a class="btn btn-xs btn-outline" href="{{ url_for('glosses.translation_comparison', language=base.language, slug=base.slug, target_language=iso) }}">
+            <a class="btn btn-xs btn-outline" href="{{ url_for('tools.translation_comparison_manual', language=base.language, slug=base.slug, target_language=iso) }}">
               {{ iso }} ({{ count }}) — open comparison
             </a>
           {% endfor %}

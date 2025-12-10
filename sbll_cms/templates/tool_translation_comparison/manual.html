@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+{% set title = "Translation Comparison" %}
+{% block content %}
+  <div class="mb-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Translation Comparison</h1>
+      <p class="text-sm text-base-content/70">{{ base.language }}: {{ base.content }} → {{ target_language }}</p>
+    </div>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('glosses.edit_gloss', language=base.language, slug=base.slug) }}">Back to gloss</a>
+  </div>
+
+  <div class="tabs tabs-boxed mb-4">
+    <a class="tab tab-active" href="#">Manual</a>
+    <a class="tab" href="{{ url_for('tools.translation_comparison_input', language=base.language, slug=base.slug, target_language=target_language) }}">Auto</a>
+  </div>
+
+  <div class="card bg-base-100 shadow-md mb-4">
+    <div class="card-body">
+      <h2 class="card-title text-lg">Source Gloss</h2>
+      <p class="font-semibold">{{ base|paraphrase }}</p>
+    </div>
+  </div>
+
+  {% if translations %}
+    <div class="overflow-x-auto">
+      <div class="flex gap-3">
+        {% for item in translations %}
+          <div class="card bg-base-100 shadow-md w-80 flex-shrink-0">
+            <div class="card-body space-y-2">
+              <div class="flex items-center justify-between">
+                <p class="font-semibold">{{ item.gloss|paraphrase }}</p>
+                <a class="link link-primary text-xs" target="_blank" href="{{ url_for('glosses.edit_gloss', language=item.gloss.language, slug=item.gloss.slug) }}">Edit</a>
+              </div>
+              {% if item.back_translations %}
+                <div>
+                  <p class="text-xs text-base-content/70">Back translations ({{ base.language }}):</p>
+                  <div class="flex flex-wrap gap-1">
+                    {% for bt in item.back_translations %}
+                      <a class="badge badge-outline" target="_blank" href="{{ url_for('glosses.edit_gloss', language=bt.language, slug=bt.slug) }}">{{ bt|paraphrase }}</a>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+              {% if item.notes %}
+                <div class="space-y-1">
+                  <p class="text-xs text-base-content/70">Notes ({{ base.language }}):</p>
+                  {% for note in item.notes %}
+                    <div class="p-2 bg-base-200 rounded text-sm">{{ note.content }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+              <form method="post" action="{{ url_for('tools.translation_comparison_manual', language=base.language, slug=base.slug, target_language=target_language) }}">
+                <input type="hidden" name="translation_ref" value="{{ item.ref }}">
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs uppercase">Add note ({{ base.language }})</span></div>
+                  <textarea name="note_content" class="textarea textarea-bordered textarea-sm" rows="2" placeholder="Add note"></textarea>
+                </label>
+                <div class="card-actions justify-end mt-2">
+                  <button class="btn btn-primary btn-sm" type="submit">Save note</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <div class="alert">
+      <span>No translations found for {{ target_language }}.</span>
+    </div>
+  {% endif %}
+{% endblock %}

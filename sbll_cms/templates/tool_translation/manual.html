@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% set title = "Translation Tool – manual" %}
+{% block content %}
+  <div class="mb-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Translation Tool (manual)</h1>
+      <p class="text-sm text-base-content/70">{{ gloss.language }}</p>
+    </div>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('glosses.edit_gloss', language=gloss.language, slug=gloss.slug) }}">Back to gloss</a>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+  {% endif %}
+  {% if message %}
+    <div class="alert alert-success">{{ message }}</div>
+  {% endif %}
+
+  <div class="card bg-base-100 shadow-md mb-4">
+    <div class="card-body">
+      <form method="post" action="{{ url_for('tools.translation_tool_manual', language=gloss.language, slug=gloss.slug) }}" class="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <label class="form-control">
+          <div class="label"><span class="label-text font-semibold">Target language</span></div>
+          <select name="target_language" class="select select-bordered select-sm">
+            {% for lang in languages %}
+              <option value="{{ lang.iso_code }}" {% if lang.iso_code == target_language %}selected{% endif %}>{{ lang.symbol }} — {{ lang.display_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="form-control">
+          <div class="label"><span class="label-text font-semibold">Translation</span></div>
+          <input name="content" class="input input-bordered input-sm" placeholder="Add translation" />
+        </label>
+        <div class="flex justify-end">
+          <button class="btn btn-primary btn-sm" name="action" value="add" type="submit">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-md">
+    <div class="card-body">
+      <h2 class="card-title text-lg">Current translations</h2>
+      {% if translations %}
+        <table class="table table-zebra">
+          <thead><tr><th>Translation</th><th class="w-32 text-right">Actions</th></tr></thead>
+          <tbody>
+            {% for ref, t in translations %}
+              <tr>
+                <td>{{ t|paraphrase }}</td>
+                <td class="text-right">
+                  <form method="post" action="{{ url_for('tools.translation_tool_manual', language=gloss.language, slug=gloss.slug) }}" class="inline">
+                    <input type="hidden" name="detach_ref" value="{{ ref }}">
+                    <button class="btn btn-ghost btn-xs" name="action" value="detach" type="submit">Detach</button>
+                  </form>
+                  <a class="btn btn-ghost btn-xs" target="_blank" href="{{ url_for('glosses.edit_gloss', language=t.language, slug=t.slug) }}">Open</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="text-sm text-base-content/70">No translations yet.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

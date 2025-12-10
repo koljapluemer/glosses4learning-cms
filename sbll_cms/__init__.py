@@ -2,15 +2,12 @@ from __future__ import annotations
 
 from flask import Flask
 
-from .config import Config
-from .language import LanguageStore
-from .storage import GlossStorage
-from .views import bp as glosses_bp
-from .views_htmx import bp as htmx_bp
-from .views_settings import bp as settings_bp
-from .views_specialist import bp as specialist_bp
-from .settings import SettingsStore
-from .utils import paraphrase_display, filter_translations
+from sbll_cms.config import Config
+from sbll_cms.entities.language import LanguageStore
+from sbll_cms.settings import SettingsStore
+from sbll_cms.storage import GlossStorage
+from sbll_cms.utils import filter_translations, paraphrase_display
+from sbll_cms.views import register_views
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
@@ -27,10 +24,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     app.jinja_env.filters["paraphrase"] = paraphrase_display
     app.jinja_env.filters["filter_translations"] = filter_translations
 
-    app.register_blueprint(glosses_bp)
-    app.register_blueprint(htmx_bp, url_prefix="/htmx")
-    app.register_blueprint(settings_bp, url_prefix="/settings")
-    app.register_blueprint(specialist_bp, url_prefix="/specialist")
+    register_views(app)
     return app
 
 

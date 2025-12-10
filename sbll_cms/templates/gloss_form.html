@@ -50,15 +50,13 @@
           </div>
         </div>
 
-        <!-- Translation AI tool -->
-        <div hx-get="{{ url_for('htmx.translation_tool', language=gloss.language, slug=gloss.slug) }}"
-             hx-trigger="load"
-             hx-target="this"
-             hx-swap="outerHTML">
-          <div class="card bg-base-100 shadow-md">
-            <div class="card-body">
-              <div class="skeleton h-6 w-32 mb-2"></div>
-              <div class="skeleton h-4 w-full"></div>
+        <!-- Translation tool links -->
+        <div class="card bg-base-100 shadow-md">
+          <div class="card-body space-y-2">
+            <h3 class="card-title text-lg">Translation tools</h3>
+            <div class="flex flex-wrap gap-2">
+              <a class="btn btn-outline btn-sm" href="{{ url_for('tools.translation_tool_input', language=gloss.language, slug=gloss.slug) }}">Generate translations</a>
+              <a class="btn btn-outline btn-sm" href="{{ url_for('tools.translation_tool_manual', language=gloss.language, slug=gloss.slug) }}">Manage manually</a>
             </div>
           </div>
         </div>

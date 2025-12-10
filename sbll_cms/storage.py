@@ -6,8 +6,9 @@ from typing import Iterable, Iterator
 
 from flask import current_app
 
-from .gloss import Gloss
-from .utils import derive_slug, normalize_language_code
+from sbll_cms.entities.gloss import Gloss
+from sbll_cms.utils.derive_slug import derive_slug
+from sbll_cms.utils.normalize_language_code import normalize_language_code
 
 
 class GlossStorage:
@@ -129,7 +130,7 @@ class GlossStorage:
             old_path.unlink()
 
         # Rewrite references across all glosses.
-        from .gloss import RELATIONSHIP_FIELDS  # local import to avoid cycle
+        from sbll_cms.entities.gloss import RELATIONSHIP_FIELDS  # local import to avoid cycle
 
         for item in self.list_glosses():
             changed = False
