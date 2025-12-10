@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+{% set title = "Add Procedural Goals – AI Output" %}
+{% block content %}
+  <div class="mb-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Add Procedural-Paraphrase Goals (AI)</h1>
+      <p class="text-sm text-base-content/70">For situation: <em>{{ situation|paraphrase }}</em></p>
+    </div>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('tools.add_procedural_goals_input', language=situation.language, slug=situation.slug, target_language=target_language, native_language=native_language) }}">Change inputs</a>
+  </div>
+
+  {% if ai_error %}
+    <div class="alert alert-error mb-4">{{ ai_error }}</div>
+  {% endif %}
+  {% if ai_message %}
+    <div class="alert alert-success mb-4">{{ ai_message }}</div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('tools.add_procedural_goals_output', language=situation.language, slug=situation.slug) }}" class="space-y-4">
+    <input type="hidden" name="target_language" value="{{ target_language }}">
+    <input type="hidden" name="native_language" value="{{ native_language }}">
+    <input type="hidden" name="provider_model" value="{{ provider_model }}">
+    <input type="hidden" name="context" value="{{ context }}">
+    <input type="hidden" name="num_goals" value="{{ num_goals }}">
+    <input type="hidden" name="results_json" value='{{ ai_results_json }}'>
+
+    {% if not ai_results %}
+      <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+          <p>No results yet. Click "Generate" to create procedural-paraphrase goals.</p>
+          <button class="btn btn-primary" name="action" value="ai_generate" type="submit">Generate Goals</button>
+        </div>
+      </div>
+    {% else %}
+      <div class="card bg-base-100 shadow-md">
+        <div class="card-body space-y-3">
+          <h2 class="card-title">Generated Goals ({{ native_language }})</h2>
+          <p class="text-sm text-base-content/70">Select procedural descriptions of things learners want to express:</p>
+          {% for result in ai_results %}
+            <label class="flex items-start gap-3 p-3 border rounded hover:bg-base-200">
+              <input type="checkbox" class="checkbox checkbox-sm mt-1" name="selected_goal" value="{{ result.content }}" checked>
+              <span class="flex-1">{{ result.content }}</span>
+            </label>
+          {% endfor %}
+
+          <div class="flex gap-2 justify-end mt-4">
+            <button class="btn" name="action" value="ai_discard" type="submit">Discard</button>
+            <button class="btn" name="action" value="ai_accept_all" type="submit">Accept All</button>
+            <button class="btn btn-primary" name="action" value="ai_accept_selection" type="submit">Accept Selected</button>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </form>
+
+  <div class="flex gap-2 mt-4">
+    <a href="{{ url_for('situations.gloss_manage_as_situation', language=situation.language, slug=situation.slug, native_language=native_language, target_language=target_language) }}" class="btn btn-ghost">Back to Situation</a>
+    <a href="{{ url_for('tools.add_procedural_goals_manual', language=situation.language, slug=situation.slug, target_language=target_language, native_language=native_language) }}" class="btn btn-outline">Switch to Manual Mode</a>
+  </div>
+{% endblock %}
