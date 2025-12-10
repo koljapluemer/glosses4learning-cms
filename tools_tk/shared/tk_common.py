@@ -1,12 +1,26 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, font
 from typing import Callable
 
 
 def make_root(title: str) -> tk.Tk:
     root = tk.Tk()
+
+    # Fix for HiDPI/4K screens on Linux - scale all default fonts
+    # tk scaling often doesn't work on Linux, so we directly modify fonts
+    scale_factor = 2.0  # Adjust this value for your 4K screen
+
+    default_font = font.nametofont("TkDefaultFont")
+    default_font.configure(size=int(default_font.cget("size") * scale_factor))
+
+    text_font = font.nametofont("TkTextFont")
+    text_font.configure(size=int(text_font.cget("size") * scale_factor))
+
+    fixed_font = font.nametofont("TkFixedFont")
+    fixed_font.configure(size=int(fixed_font.cget("size") * scale_factor))
+
     root.title(title)
     root.geometry("900x700")
     return root
