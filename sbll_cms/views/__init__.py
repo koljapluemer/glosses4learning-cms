@@ -26,6 +26,7 @@ def register_views(app: Flask) -> None:
         settings_api_update,
         settings_page,
         tool_break_up_glosses,
+        tool_create_situation,
         tool_missing_translations,
         tool_missing_target_translations,
         tool_missing_usage_examples,

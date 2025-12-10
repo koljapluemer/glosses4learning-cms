@@ -11,6 +11,11 @@
     </a>
   </div>
 
+  <div class="flex gap-3 mb-3 text-sm">
+    <a href="{{ url_for('tools.create_situation_input') }}" class="link link-hover">+ Create with AI</a>
+    <a href="{{ url_for('tools.create_situation_manual') }}" class="link link-hover">+ Create manually</a>
+  </div>
+
   {% if glosses %}
     <div class="overflow-x-auto card bg-base-100 shadow-md">
       <div class="card-body p-0">
@@ -39,7 +44,7 @@
     </div>
   {% else %}
     <div class="alert">
-      <span>No situations found. Tag glosses with "situation" to manage them here.</span>
+      <span>No situations found. Use the links above to create your first situation.</span>
     </div>
   {% endif %}
 {% endblock %}
