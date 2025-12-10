@@ -6,7 +6,7 @@
     <p class="text-sm text-base-content/70">Generate situation descriptions using AI.</p>
   </div>
 
-  <form method="post" action="{{ url_for('tools.create_situation_output') }}" class="space-y-4">
+  <form method="get" action="{{ url_for('tools.create_situation_output') }}" class="space-y-4">
     <label class="form-control">
       <div class="label"><span class="label-text font-semibold">Provider &amp; Model</span></div>
       <select name="provider_model" class="select select-bordered">
@@ -29,7 +29,7 @@
 
     <div class="flex gap-2 justify-end">
       <a href="{{ url_for('situations.list_situations') }}" class="btn btn-ghost">Cancel</a>
-      <button class="btn btn-primary" type="submit" name="action" value="ai_generate">Generate</button>
+      <button class="btn btn-primary" type="submit">Continue</button>
     </div>
   </form>
 {% endblock %}

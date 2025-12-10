@@ -134,21 +134,40 @@ def add_procedural_goals_output(language: str, slug: str):
 
     settings = current_app.extensions["settings_store"].load()
 
-    # Extract form parameters
-    provider_model = request.form.get("provider_model", "OpenAI|gpt-4o-mini")
+    json_mode = request.method == "POST" and request.is_json
+
+    if json_mode:
+        payload = request.get_json(force=True) or {}
+        provider_model = payload.get("provider_model", "OpenAI|gpt-4o-mini")
+        target_language = (payload.get("target_language") or "").strip()
+        native_language = (payload.get("native_language") or "").strip()
+        context = payload.get("context", "")
+        num_goals = int(payload.get("num_goals", 5))
+        action = (payload.get("mode") or payload.get("action") or "").strip()
+        results_json = json.dumps(payload.get("results") or [])
+        selected_contents = []
+        for entry in payload.get("selections", []):
+            if isinstance(entry, str):
+                selected_contents.append(entry)
+            elif isinstance(entry, dict):
+                val = (entry.get("value") or "").strip()
+                if val:
+                    selected_contents.append(val)
+    else:
+        provider_model = request.values.get("provider_model", "OpenAI|gpt-4o-mini")
+        target_language = (request.values.get("target_language") or "").strip()
+        native_language = (request.values.get("native_language") or "").strip()
+        context = request.values.get("context", "")
+        num_goals = int(request.values.get("num_goals", 5))
+        action = ""
+        results_json = request.values.get("results_json", "[]")
+        selected_contents = []
+
     if "|" in provider_model:
         provider, model = provider_model.split("|", 1)
     else:
         provider, model = provider_model, ""
 
-    target_language = request.form.get("target_language", "").strip()
-    native_language = request.form.get("native_language", "").strip()
-    context = request.form.get("context", "")
-    num_goals = int(request.form.get("num_goals", 5))
-    action = request.form.get("action", "")
-    results_json = request.form.get("results_json", "[]")
-
-    # Parse existing AI results
     try:
         ai_results = json.loads(results_json) if results_json else []
     except Exception:  # noqa: BLE001
@@ -158,8 +177,8 @@ def add_procedural_goals_output(language: str, slug: str):
     ai_message = None
 
     try:
-        if request.method == "POST":
-            if action == "ai_generate":
+        if json_mode:
+            if action in ("ai_generate", "generate"):
                 # Validate
                 if not settings or not settings.api_keys.openai:
                     ai_error = "OpenAI API key missing. Add it in Settings."
@@ -193,11 +212,8 @@ def add_procedural_goals_output(language: str, slug: str):
                     else:
                         ai_results = result.get("goals", [])
 
-            elif action in ("ai_accept_all", "ai_accept_selection"):
-                # Get selected goals
-                selected_contents = request.form.getlist("selected_goal")
-
-                if action == "ai_accept_all":
+            elif action in ("ai_accept_all", "ai_accept_selection", "accept_all", "accept_selection"):
+                if action in ("ai_accept_all", "accept_all"):
                     to_create = [r["content"] for r in ai_results]
                 else:
                     to_create = selected_contents
@@ -241,18 +257,24 @@ def add_procedural_goals_output(language: str, slug: str):
                         created_count += 1
 
                     # Link to situation via children field
-                    attach_relation(storage, situation, "children", goal)
+                        attach_relation(storage, situation, "children", goal)
 
                 ai_message = f"Created {created_count} goals. Skipped {skipped_count} existing. Linked to situation."
                 ai_results = []  # Clear after accepting
 
-            elif action == "ai_discard":
+            elif action in ("ai_discard", "discard"):
                 ai_results = []
     except Exception as exc:  # noqa: BLE001
         ai_error = str(exc)
         ai_results = []
 
-    ai_results_json = json.dumps(ai_results)
+    if json_mode:
+        status = 200 if not ai_error else 400
+        return {
+            "ai_results": ai_results,
+            "ai_error": ai_error,
+            "ai_message": ai_message,
+        }, status
 
     return render_template(
         "tool_add_procedural_goals/output_form.html",
@@ -262,10 +284,6 @@ def add_procedural_goals_output(language: str, slug: str):
         provider_model=provider_model,
         context=context,
         num_goals=num_goals,
-        ai_results=ai_results,
-        ai_results_json=ai_results_json,
-        ai_error=ai_error,
-        ai_message=ai_message,
     )
 
 

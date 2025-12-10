@@ -121,19 +121,36 @@ def create_situation_output():
     storage = get_storage()
     settings = current_app.extensions["settings_store"].load()
 
-    # Extract form parameters
-    provider_model = request.form.get("provider_model", "OpenAI|gpt-4o-mini")
+    json_mode = request.method == "POST" and request.is_json
+
+    if json_mode:
+        payload = request.get_json(force=True) or {}
+        provider_model = payload.get("provider_model") or "OpenAI|gpt-4o-mini"
+        context = payload.get("context", "")
+        num_situations = int(payload.get("num_situations", 3))
+        action = (payload.get("mode") or payload.get("action") or "").strip()
+        results_json = json.dumps(payload.get("results") or [])
+        selected_contents = []
+        for entry in payload.get("selections", []):
+            if isinstance(entry, str):
+                selected_contents.append(entry)
+            elif isinstance(entry, dict):
+                val = (entry.get("value") or "").strip()
+                if val:
+                    selected_contents.append(val)
+    else:
+        provider_model = request.values.get("provider_model", "OpenAI|gpt-4o-mini")
+        context = request.values.get("context", "")
+        num_situations = int(request.values.get("num_situations", 3))
+        action = ""
+        results_json = request.values.get("results_json", "[]")
+        selected_contents = []
+
     if "|" in provider_model:
         provider, model = provider_model.split("|", 1)
     else:
         provider, model = provider_model, ""
 
-    context = request.form.get("context", "")
-    num_situations = int(request.form.get("num_situations", 3))
-    action = request.form.get("action", "")
-    results_json = request.form.get("results_json", "[]")
-
-    # Parse existing AI results
     try:
         ai_results = json.loads(results_json) if results_json else []
     except Exception:  # noqa: BLE001
@@ -143,8 +160,8 @@ def create_situation_output():
     ai_message = None
 
     try:
-        if request.method == "POST":
-            if action == "ai_generate":
+        if json_mode:
+            if action in ("ai_generate", "generate"):
                 # Validate
                 if not settings or not settings.api_keys.openai:
                     ai_error = "OpenAI API key missing. Add it in Settings."
@@ -165,11 +182,8 @@ def create_situation_output():
                     else:
                         ai_results = result.get("situations", [])
 
-            elif action in ("ai_accept_all", "ai_accept_selection"):
-                # Get selected situations
-                selected_contents = request.form.getlist("selected_situation")
-
-                if action == "ai_accept_all":
+            elif action in ("ai_accept_all", "ai_accept_selection", "accept_all", "accept_selection"):
+                if action in ("ai_accept_all", "accept_all"):
                     to_create = [r["content"] for r in ai_results]
                 else:
                     to_create = selected_contents
@@ -206,23 +220,25 @@ def create_situation_output():
                 ai_message = f"Created {created_count} new situations. Skipped {skipped_count} existing."
                 ai_results = []  # Clear after accepting
 
-            elif action == "ai_discard":
+            elif action in ("ai_discard", "discard"):
                 ai_results = []
     except Exception as exc:  # noqa: BLE001
         ai_error = str(exc)
         ai_results = []
 
-    ai_results_json = json.dumps(ai_results)
+    if json_mode:
+        status = 200 if not ai_error else 400
+        return {
+            "ai_results": ai_results,
+            "ai_error": ai_error,
+            "ai_message": ai_message,
+        }, status
 
     return render_template(
         "tool_create_situation/output_form.html",
         provider_model=provider_model,
         context=context,
         num_situations=num_situations,
-        ai_results=ai_results,
-        ai_results_json=ai_results_json,
-        ai_error=ai_error,
-        ai_message=ai_message,
     )
 
 

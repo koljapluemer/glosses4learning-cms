@@ -99,15 +99,36 @@ def missing_target_translations_input():
 @tools_bp.route("/missing-target-translations/output", methods=["GET", "POST"])
 def missing_target_translations_output():
     storage = get_storage()
-    refs_raw = request.values.get("refs") or "[]"
-    native_language = (request.values.get("native_language") or "").strip().lower()
-    target_language = (request.values.get("target_language") or "").strip().lower()
-    action = (request.form.get("action") or "").strip()
-    selected_refs = [r.strip() for r in (request.form.getlist("selected_ref") or []) if r.strip()]
-    selected_translations = [t for t in (request.form.getlist("selected_translation") or []) if t.strip()]
-    provider_model = request.form.get("provider_model") or "OpenAI|gpt-4o-mini"
-    context = request.form.get("context") or ""
-    results_raw = request.form.get("results_json") or "[]"
+    json_mode = request.method == "POST" and request.is_json
+
+    if json_mode:
+        payload = request.get_json(force=True) or {}
+        refs_raw = json.dumps(payload.get("refs") or [])
+        native_language = (payload.get("native_language") or "").strip().lower()
+        target_language = (payload.get("target_language") or "").strip().lower()
+        action = (payload.get("mode") or payload.get("action") or "").strip()
+        selected_refs = [r.strip() for r in (payload.get("selected_refs") or []) if isinstance(r, str) and r.strip()]
+        selected_translations = []
+        for entry in payload.get("selections", []):
+            if not isinstance(entry, dict):
+                continue
+            ref = (entry.get("ref") or "").strip()
+            translation = (entry.get("value") or "").strip()
+            if ref and translation:
+                selected_translations.append(json.dumps({"ref": ref, "translation": translation}))
+        provider_model = payload.get("provider_model") or "OpenAI|gpt-4o-mini"
+        context = payload.get("context") or ""
+        results_raw = json.dumps(payload.get("results") or [])
+    else:
+        refs_raw = request.values.get("refs") or "[]"
+        native_language = (request.values.get("native_language") or "").strip().lower()
+        target_language = (request.values.get("target_language") or "").strip().lower()
+        action = ""
+        selected_refs = [r.strip() for r in (request.form.getlist("selected_ref") or []) if r.strip()]
+        selected_translations = [t for t in (request.form.getlist("selected_translation") or []) if t.strip()]
+        provider_model = request.values.get("provider_model") or "OpenAI|gpt-4o-mini"
+        context = request.values.get("context") or ""
+        results_raw = request.values.get("results_json") or "[]"
 
     try:
         ai_results = json.loads(results_raw)
@@ -130,12 +151,15 @@ def missing_target_translations_output():
                 glosses.append(gloss)
 
     settings = current_app.extensions["settings_store"].load()
-    provider, model = provider_model.split("|", 1)
+    if "|" in provider_model:
+        provider, model = provider_model.split("|", 1)
+    else:
+        provider, model = provider_model, ""
 
-    if request.method == "POST":
+    if json_mode:
         if not native_language or not target_language:
             ai_error = "Both native_language and target_language are required."
-        elif action == "mark_impossible":
+        elif action in ("mark_impossible",):
             for ref in selected_refs:
                 gloss = storage.resolve_reference(ref)
                 if gloss:
@@ -144,7 +168,7 @@ def missing_target_translations_output():
                     gloss.logs = logs
                     storage.save_gloss(gloss)
             glosses = [g for g in glosses if should_translate_missing_into_target(g, native_language, target_language)]
-        elif action == "ai_generate":
+        elif action in ("ai_generate", "generate"):
             if not selected_refs:
                 ai_error = "Select glosses to translate."
             elif provider != "OpenAI":
@@ -174,13 +198,13 @@ def missing_target_translations_output():
                     })
                 if not ai_results:
                     ai_error = "No eligible glosses found to translate."
-        elif action in ("ai_accept_all", "ai_accept_selection"):
+        elif action in ("ai_accept_all", "ai_accept_selection", "accept_all", "accept_selection"):
             if not ai_results:
                 ai_error = "No AI results to accept."
             else:
                 added = 0
                 selection_map: dict[str, list[str]] = {}
-                if action == "ai_accept_selection":
+                if action in ("ai_accept_selection", "accept_selection"):
                     for val in selected_translations:
                         try:
                             entry = json.loads(val)
@@ -199,7 +223,7 @@ def missing_target_translations_output():
                     if not gloss:
                         continue
                     translations = item.get("translations") or []
-                    chosen = translations if action == "ai_accept_all" else selection_map.get(ref, [])
+                    chosen = translations if action in ("ai_accept_all", "accept_all") else selection_map.get(ref, [])
                     for t_text in chosen:
                         t_text = t_text.strip()
                         if not t_text:
@@ -209,20 +233,23 @@ def missing_target_translations_output():
                         added += 1
                 ai_results = []
                 ai_message = f"Added {added} translations." if added else "No translations added."
-        elif action == "ai_discard":
+        elif action in ("ai_discard", "discard"):
             ai_results = []
 
-    ai_results_json = json.dumps(ai_results)
+    if json_mode:
+        status = 200 if not ai_error else 400
+        return {
+            "ai_results": ai_results,
+            "ai_error": ai_error,
+            "ai_message": ai_message,
+        }, status
+
     return render_template(
         "tool_missing_target_translations/output_form.html",
         glosses=glosses,
         refs_json=refs_raw,
         provider_model=provider_model,
         context=context,
-        ai_results=ai_results,
-        ai_results_json=ai_results_json,
-        ai_error=ai_error,
-        ai_message=ai_message,
         native_language=native_language,
         target_language=target_language,
     )

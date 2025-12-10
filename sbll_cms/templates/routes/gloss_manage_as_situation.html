@@ -50,51 +50,87 @@
 
     <div class="mt-4 card bg-base-100 shadow-md">
       <div class="card-body">
-        <h2 class="card-title text-lg">Tool Links</h2>
-        <form method="get" action="{{ url_for('tools.add_understand_goals_input', language=situation.language, slug=situation.slug) }}" target="_blank">
-          <input type="hidden" name="native_language" value="{{ native_language }}" />
-          <input type="hidden" name="target_language" value="{{ target_language }}" />
-          <button class="btn btn-sm" type="submit" {% if not native_language or not target_language %}disabled{% endif %}>
-            Add understand-expression-goals ({{ target_language }})
-          </button>
-        </form>
-        <form class="mt-2" method="get" action="{{ url_for('tools.add_procedural_goals_input', language=situation.language, slug=situation.slug) }}" target="_blank">
-          <input type="hidden" name="native_language" value="{{ native_language }}" />
-          <input type="hidden" name="target_language" value="{{ target_language }}" />
-          <button class="btn btn-sm" type="submit" {% if not native_language or not target_language %}disabled{% endif %}>
-            Add procedural-paraphrase-goals ({{ native_language }})
-          </button>
-        </form>
-        <form class="mt-2" method="get" action="{{ url_for('tools.break_up_glosses_manual') }}" target="_blank">
-          <input type="hidden" name="refs" value='{{ break_up_refs_json|safe }}' />
-          <button class="btn btn-sm" type="submit" {% if break_up_count == 0 %}disabled{% endif %}>
-            Break up glosses with no parts ({{ break_up_count }})
-          </button>
-        </form>
-        <form class="mt-2" method="get" action="{{ url_for('tools.missing_translations_manual') }}" target="_blank">
-          <input type="hidden" name="refs" value='{{ missing_translation_refs_json|safe }}' />
-          <input type="hidden" name="native_language" value="{{ native_language }}" />
-          <input type="hidden" name="target_language" value="{{ target_language }}" />
-          <button class="btn btn-sm" type="submit" {% if missing_translation_count == 0 %}disabled{% endif %}>
-            Fill missing translations for target lang expressions ({{ missing_translation_count }})
-          </button>
-        </form>
-        <form class="mt-2" method="get" action="{{ url_for('tools.missing_target_translations_manual') }}" target="_blank">
-          <input type="hidden" name="refs" value='{{ missing_target_refs_json|safe }}' />
-          <input type="hidden" name="native_language" value="{{ native_language }}" />
-          <input type="hidden" name="target_language" value="{{ target_language }}" />
-          <button class="btn btn-sm" type="submit" {% if missing_target_count == 0 %}disabled{% endif %}>
-            Fill target translations for native expressions ({{ missing_target_count }})
-          </button>
-        </form>
-        <form class="mt-2" method="get" action="{{ url_for('tools.missing_usage_examples_manual') }}" target="_blank">
-          <input type="hidden" name="refs" value='{{ missing_usage_refs_json|safe }}' />
-          <input type="hidden" name="target_language" value="{{ target_language }}" />
-          <button class="btn btn-sm" type="submit" {% if missing_usage_count == 0 %}disabled{% endif %}>
-            Add usage examples ({{ missing_usage_count }})
-          </button>
-        </form>
-        <form class="mt-4" method="get" action="{{ url_for('situations.export_situation', language=situation.language, slug=situation.slug) }}">
+        <h2 class="card-title text-lg mb-3">Tool Links</h2>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>AI Mode</th>
+                <th>Manual Mode</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Add understand-expression-goals ({{ target_language }})</td>
+                <td>
+                  <a class="link link-hover text-sm" href="{{ url_for('tools.add_understand_goals_input', language=situation.language, slug=situation.slug, native_language=native_language, target_language=target_language) }}" target="_blank" {% if not native_language or not target_language %}onclick="return false" class="link-disabled text-base-content/30"{% endif %}>AI</a>
+                </td>
+                <td>
+                  <a class="link link-hover text-sm" href="{{ url_for('tools.add_understand_goals_manual', language=situation.language, slug=situation.slug, native_language=native_language, target_language=target_language) }}" target="_blank" {% if not native_language or not target_language %}onclick="return false" class="link-disabled text-base-content/30"{% endif %}>Manual</a>
+                </td>
+              </tr>
+              <tr>
+                <td>Add procedural-paraphrase-goals ({{ native_language }})</td>
+                <td>
+                  <a class="link link-hover text-sm" href="{{ url_for('tools.add_procedural_goals_input', language=situation.language, slug=situation.slug, native_language=native_language, target_language=target_language) }}" target="_blank" {% if not native_language or not target_language %}onclick="return false" class="link-disabled text-base-content/30"{% endif %}>AI</a>
+                </td>
+                <td>
+                  <a class="link link-hover text-sm" href="{{ url_for('tools.add_procedural_goals_manual', language=situation.language, slug=situation.slug, native_language=native_language, target_language=target_language) }}" target="_blank" {% if not native_language or not target_language %}onclick="return false" class="link-disabled text-base-content/30"{% endif %}>Manual</a>
+                </td>
+              </tr>
+              <tr>
+                <td>Break up glosses with no parts ({{ break_up_count }})</td>
+                <td>
+                  <form method="get" action="{{ url_for('tools.break_up_glosses_input', language=situation.language, slug=situation.slug) }}" target="_blank" class="inline">
+                    <input type="hidden" name="refs" value='{{ break_up_refs_json|safe }}' />
+                    <input type="hidden" name="native_language" value="{{ native_language }}" />
+                    <input type="hidden" name="target_language" value="{{ target_language }}" />
+                    <button class="link link-hover text-sm" type="submit" {% if break_up_count == 0 %}disabled class="link-disabled text-base-content/30"{% endif %}>AI</button>
+                  </form>
+                </td>
+                <td class="text-base-content/40">—</td>
+              </tr>
+              <tr>
+                <td>Fill missing translations for target expressions ({{ missing_translation_count }})</td>
+                <td>
+                  <form method="get" action="{{ url_for('tools.missing_translations_input') }}" target="_blank" class="inline">
+                    <input type="hidden" name="refs" value='{{ missing_translation_refs_json|safe }}' />
+                    <input type="hidden" name="native_language" value="{{ native_language }}" />
+                    <input type="hidden" name="target_language" value="{{ target_language }}" />
+                    <button class="link link-hover text-sm" type="submit" {% if missing_translation_count == 0 %}disabled class="link-disabled text-base-content/30"{% endif %}>AI</button>
+                  </form>
+                </td>
+                <td class="text-base-content/40">—</td>
+              </tr>
+              <tr>
+                <td>Fill target translations for native expressions ({{ missing_target_count }})</td>
+                <td>
+                  <form method="get" action="{{ url_for('tools.missing_target_translations_input') }}" target="_blank" class="inline">
+                    <input type="hidden" name="refs" value='{{ missing_target_refs_json|safe }}' />
+                    <input type="hidden" name="native_language" value="{{ native_language }}" />
+                    <input type="hidden" name="target_language" value="{{ target_language }}" />
+                    <button class="link link-hover text-sm" type="submit" {% if missing_target_count == 0 %}disabled class="link-disabled text-base-content/30"{% endif %}>AI</button>
+                  </form>
+                </td>
+                <td class="text-base-content/40">—</td>
+              </tr>
+              <tr>
+                <td>Add usage examples ({{ missing_usage_count }})</td>
+                <td>
+                  <form method="get" action="{{ url_for('tools.missing_usage_examples_input') }}" target="_blank" class="inline">
+                    <input type="hidden" name="refs" value='{{ missing_usage_refs_json|safe }}' />
+                    <input type="hidden" name="target_language" value="{{ target_language }}" />
+                    <button class="link link-hover text-sm" type="submit" {% if missing_usage_count == 0 %}disabled class="link-disabled text-base-content/30"{% endif %}>AI</button>
+                  </form>
+                </td>
+                <td class="text-base-content/40">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="divider"></div>
+        <form method="get" action="{{ url_for('situations.export_situation', language=situation.language, slug=situation.slug) }}">
           <input type="hidden" name="native_language" value="{{ native_language }}">
           <input type="hidden" name="target_language" value="{{ target_language }}">
           <button class="btn btn-outline btn-sm" type="submit" {% if not native_language or not target_language %}disabled{% endif %}>

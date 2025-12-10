@@ -7,7 +7,7 @@
     <p class="text-xs text-base-content/60 mt-1">Creating goals in target language: <span class="uppercase font-mono">{{ target_language }}</span></p>
   </div>
 
-  <form method="post" action="{{ url_for('tools.add_understand_goals_output', language=situation.language, slug=situation.slug) }}" class="space-y-4">
+  <form method="get" action="{{ url_for('tools.add_understand_goals_output', language=situation.language, slug=situation.slug) }}" class="space-y-4">
     <input type="hidden" name="target_language" value="{{ target_language }}">
     <input type="hidden" name="native_language" value="{{ native_language }}">
 
@@ -37,7 +37,7 @@
 
     <div class="flex gap-2 justify-end">
       <a href="{{ url_for('situations.gloss_manage_as_situation', language=situation.language, slug=situation.slug, native_language=native_language, target_language=target_language) }}" class="btn btn-ghost">Cancel</a>
-      <button class="btn btn-primary" type="submit" name="action" value="ai_generate">Generate</button>
+      <button class="btn btn-primary" type="submit">Continue</button>
     </div>
   </form>
 

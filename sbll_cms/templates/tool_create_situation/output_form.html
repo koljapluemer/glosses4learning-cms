@@ -9,49 +9,79 @@
     <a class="btn btn-ghost btn-sm" href="{{ url_for('tools.create_situation_input') }}">Change inputs</a>
   </div>
 
-  {% if ai_error %}
-    <div class="alert alert-error mb-4">{{ ai_error }}</div>
-  {% endif %}
-  {% if ai_message %}
-    <div class="alert alert-success mb-4">{{ ai_message }}</div>
-  {% endif %}
+  <div id="ai-messages"></div>
 
-  <form method="post" action="{{ url_for('tools.create_situation_output') }}" class="space-y-4">
-    <input type="hidden" name="provider_model" value="{{ provider_model }}">
-    <input type="hidden" name="context" value="{{ context }}">
-    <input type="hidden" name="num_situations" value="{{ num_situations }}">
-    <input type="hidden" name="results_json" value='{{ ai_results_json }}'>
-
-    {% if not ai_results %}
-      <div class="card bg-base-100 shadow-md">
-        <div class="card-body">
-          <p>No results yet. Click "Generate" to create situations.</p>
-          <button class="btn btn-primary" name="action" value="ai_generate" type="submit">Generate Situations</button>
+  <div class="space-y-4">
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body space-y-3">
+        <div class="grid gap-3 md:grid-cols-2">
+          <label class="form-control">
+            <div class="label"><span class="label-text font-semibold">Provider &amp; Model</span></div>
+            <select id="provider-model" class="select select-bordered">
+              <option value="OpenAI|gpt-4o-mini" {% if provider_model == "OpenAI|gpt-4o-mini" %}selected{% endif %}>OpenAI | gpt-4o-mini</option>
+              <option value="OpenAI|gpt-4.1" {% if provider_model == "OpenAI|gpt-4.1" %}selected{% endif %}>OpenAI | gpt-4.1</option>
+            </select>
+          </label>
+          <label class="form-control">
+            <div class="label"><span class="label-text font-semibold">Number of situations</span></div>
+            <input id="num-situations" type="number" class="input input-bordered" min="1" max="10" value="{{ num_situations }}">
+            <div class="label"><span class="label-text-alt">Generate 1-10 at a time.</span></div>
+          </label>
+          <label class="form-control md:col-span-2">
+            <div class="label"><span class="label-text font-semibold">Context / Theme (optional)</span></div>
+            <textarea id="context" class="textarea textarea-bordered" rows="3" placeholder="E.g., travel, restaurant, emergencies">{{ context }}</textarea>
+          </label>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary" type="button" id="btn-generate">Generate situations</button>
         </div>
       </div>
-    {% else %}
-      <div class="card bg-base-100 shadow-md">
-        <div class="card-body space-y-3">
-          <h2 class="card-title">Generated Situations</h2>
-          {% for result in ai_results %}
-            <label class="flex items-start gap-3 p-3 border rounded hover:bg-base-200">
-              <input type="checkbox" class="checkbox checkbox-sm mt-1" name="selected_situation" value="{{ result.content }}" checked>
-              <span class="flex-1">{{ result.content }}</span>
-            </label>
-          {% endfor %}
+    </div>
 
-          <div class="flex gap-2 justify-end mt-4">
-            <button class="btn" name="action" value="ai_discard" type="submit">Discard</button>
-            <button class="btn" name="action" value="ai_accept_all" type="submit">Accept All</button>
-            <button class="btn btn-primary" name="action" value="ai_accept_selection" type="submit">Accept Selected</button>
-          </div>
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body space-y-3">
+        <div class="flex gap-2">
+          <button class="btn" type="button" id="btn-discard">Discard</button>
+          <button class="btn" type="button" id="btn-accept-all">Accept all</button>
+          <button class="btn btn-primary" type="button" id="btn-accept-selected">Accept selected</button>
         </div>
+        <div id="ai-results" class="space-y-2"></div>
       </div>
-    {% endif %}
-  </form>
+    </div>
+  </div>
 
   <div class="flex gap-2 mt-4">
     <a href="{{ url_for('situations.list_situations') }}" class="btn btn-ghost">Back to Situations</a>
     <a href="{{ url_for('tools.create_situation_manual') }}" class="btn btn-outline">Switch to Manual Mode</a>
   </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/tool_ai_flow.js') }}"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const postUrl = "{{ url_for('tools.create_situation_output') }}";
+      const api = initAiTool({
+        postUrl,
+        resultsContainer: document.getElementById("ai-results"),
+        messageContainer: document.getElementById("ai-messages"),
+        generateButton: document.getElementById("btn-generate"),
+        acceptAllButton: document.getElementById("btn-accept-all"),
+        acceptSelectedButton: document.getElementById("btn-accept-selected"),
+        discardButton: document.getElementById("btn-discard"),
+        resultField: "content",
+        extractValues: (item) => [item.content || ""].filter(Boolean),
+        titleForResult: (item) => item.content || "Situation",
+        getMetaPayload: () => ({
+          provider_model: document.getElementById("provider-model").value,
+          num_situations: (() => {
+            const raw = parseInt(document.getElementById("num-situations").value || "3", 10);
+            return Number.isFinite(raw) ? raw : 3;
+          })(),
+          context: document.getElementById("context").value,
+        }),
+        getGeneratePayload: () => ({}),
+      });
+    });
+  </script>
 {% endblock %}

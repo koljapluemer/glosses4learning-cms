@@ -228,6 +228,20 @@ def render_tree(nodes: list[dict[str, Any]]):
     return lines
 
 
+def collect_situation_stats(storage, situation: Gloss, native_language: str, target_language: str):
+    """
+    Return only the aggregated stats for a situation; used by tool routes that
+    need the missing refs without rendering the tree.
+    """
+    _nodes, stats = build_goal_nodes(
+        situation,
+        storage=storage,
+        native_language=native_language,
+        target_language=target_language,
+    )
+    return stats
+
+
 def create_situation_export_zip(situation, storage, native_language: str, target_language: str):
     goal_nodes, stats = build_goal_nodes(
         situation,

@@ -6,70 +6,95 @@
       <h1 class="text-2xl font-bold">Break up glosses (auto)</h1>
       <p class="text-sm text-base-content/70">Select glosses and accept parts.</p>
     </div>
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('tools.break_up_glosses_input') }}?refs={{ refs_json | urlencode }}">Change inputs</a>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('tools.break_up_glosses_input', language=language, slug=slug) }}?refs={{ refs_json | urlencode }}&native_language={{ native_language }}&target_language={{ target_language }}">Change inputs</a>
   </div>
 
-  {% if ai_error %}
-    <div class="alert alert-error">{{ ai_error }}</div>
-  {% endif %}
-  {% if ai_message %}
-    <div class="alert alert-success">{{ ai_message }}</div>
-  {% endif %}
+  <div id="ai-messages"></div>
 
-  <form method="post" action="{{ url_for('tools.break_up_glosses_output') }}" class="space-y-4">
-    <input type="hidden" name="refs" value='{{ refs_json }}'>
-    <input type="hidden" name="provider_model" value="{{ provider_model }}">
-    <input type="hidden" name="context" value="{{ context }}">
-    <input type="hidden" name="results_json" value='{{ ai_results_json }}'>
-
-    {% if glosses %}
-      <div class="card bg-base-100 shadow-md">
-        <div class="card-body p-0">
-          <table class="table table-zebra table-sm">
-            <thead><tr><th class="w-12"></th><th>Gloss</th></tr></thead>
-            <tbody>
-              {% for gloss in glosses %}
-                <tr>
-                  <td><input type="checkbox" name="selected_ref" value="{{ gloss.language }}:{{ gloss.slug }}" class="checkbox checkbox-sm"></td>
-                  <td>{{ gloss|paraphrase }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+  <div class="space-y-4">
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body space-y-3">
+        <div class="grid gap-3 md:grid-cols-2">
+          <label class="form-control">
+            <div class="label"><span class="label-text font-semibold">Provider &amp; Model</span></div>
+            <select id="provider-model" class="select select-bordered">
+              <option value="OpenAI|gpt-4o-mini" {% if provider_model == "OpenAI|gpt-4o-mini" %}selected{% endif %}>OpenAI | gpt-4o-mini</option>
+              <option value="OpenAI|gpt-4.1" {% if provider_model == "OpenAI|gpt-4.1" %}selected{% endif %}>OpenAI | gpt-4.1</option>
+            </select>
+          </label>
+          <label class="form-control md:col-span-2">
+            <div class="label"><span class="label-text font-semibold">Context (optional)</span></div>
+            <textarea id="context" class="textarea textarea-bordered" rows="3" placeholder="Add optional notes">{{ context }}</textarea>
+          </label>
         </div>
-      </div>
-      <button class="btn btn-primary" name="action" value="ai_generate" type="submit">Generate parts</button>
-    {% else %}
-      <div class="alert">No glosses to process.</div>
-    {% endif %}
 
-    {% if ai_results %}
-      <div class="card bg-base-100 shadow-md">
-        <div class="card-body space-y-3">
-          {% for item in ai_results %}
-            <div class="border rounded p-2">
-              <div class="font-semibold">{{ item.content }}</div>
-              {% if item.error %}
-                <div class="alert alert-error mt-2">{{ item.error }}</div>
-              {% elif item.parts %}
-                <div class="mt-2 space-y-1">
-                  {% for part in item.parts %}
-                    <label class="flex items-center gap-2">
-                      <input type="checkbox" class="checkbox checkbox-sm" name="selected_part" value='{{ {"ref": item.ref, "part": part} | tojson }}' checked>
-                      <span>{{ part }}</span>
-                    </label>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            </div>
-          {% endfor %}
-          <div class="flex gap-2">
-            <button class="btn" name="action" value="ai_discard" type="submit">Discard results</button>
-            <button class="btn" name="action" value="ai_accept_all" type="submit">Accept all</button>
-            <button class="btn btn-primary" name="action" value="ai_accept_selection" type="submit">Accept selection</button>
+        {% if glosses %}
+          <div class="border rounded">
+            <table class="table table-zebra table-sm">
+              <thead><tr><th class="w-12"></th><th>Gloss</th></tr></thead>
+              <tbody>
+                {% for gloss in glosses %}
+                  <tr>
+                    <td><input type="checkbox" name="selected_ref" value="{{ gloss.language }}:{{ gloss.slug }}" class="checkbox checkbox-sm"></td>
+                    <td>{{ gloss|paraphrase }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
-        </div>
+          <div class="flex gap-2">
+            <button class="btn btn-primary" type="button" id="btn-generate">Generate parts</button>
+          </div>
+        {% else %}
+          <div class="alert">
+            No glosses to process. Check that native/target languages are set and the situation has parts_missing.
+          </div>
+        {% endif %}
       </div>
-    {% endif %}
-  </form>
+    </div>
+
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body space-y-3">
+        <div class="flex gap-2">
+          <button class="btn" type="button" id="btn-discard">Discard results</button>
+          <button class="btn" type="button" id="btn-accept-all">Accept all</button>
+          <button class="btn btn-primary" type="button" id="btn-accept-selected">Accept selection</button>
+        </div>
+        <div id="ai-results" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/tool_ai_flow.js') }}"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const postUrl = "{{ url_for('tools.break_up_glosses_output', language=language, slug=slug) }}";
+      const getSelectedRefs = () =>
+        Array.from(document.querySelectorAll("input[name='selected_ref']:checked")).map((el) => el.value);
+
+      initAiTool({
+        postUrl,
+        resultField: "parts",
+        resultsContainer: document.getElementById("ai-results"),
+        messageContainer: document.getElementById("ai-messages"),
+        generateButton: document.getElementById("btn-generate"),
+        acceptAllButton: document.getElementById("btn-accept-all"),
+        acceptSelectedButton: document.getElementById("btn-accept-selected"),
+        discardButton: document.getElementById("btn-discard"),
+        titleForResult: (item) => item.content || item.ref || "Gloss",
+        getMetaPayload: () => ({
+          provider_model: document.getElementById("provider-model").value,
+          context: document.getElementById("context").value,
+          native_language: "{{ native_language }}",
+          target_language: "{{ target_language }}",
+          refs: {{ refs_json | safe }},
+        }),
+        getGeneratePayload: () => ({
+          selected_refs: getSelectedRefs(),
+        }),
+      });
+    });
+  </script>
 {% endblock %}

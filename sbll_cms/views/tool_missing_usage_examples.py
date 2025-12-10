@@ -170,14 +170,34 @@ def missing_usage_examples_input():
 @tools_bp.route("/missing-usage-examples/output", methods=["GET", "POST"])
 def missing_usage_examples_output():
     storage = get_storage()
-    refs_raw = request.values.get("refs") or "[]"
-    target_language = (request.values.get("target_language") or "").strip().lower()
-    action = (request.form.get("action") or "").strip()
-    selected_refs = [r.strip() for r in (request.form.getlist("selected_ref") or []) if r.strip()]
-    selected_examples = [t for t in (request.form.getlist("selected_example") or []) if t.strip()]
-    provider_model = request.form.get("provider_model") or "OpenAI|gpt-4o-mini"
-    context = request.form.get("context") or ""
-    results_raw = request.form.get("results_json") or "[]"
+    json_mode = request.method == "POST" and request.is_json
+
+    if json_mode:
+        payload = request.get_json(force=True) or {}
+        refs_raw = json.dumps(payload.get("refs") or [])
+        target_language = (payload.get("target_language") or "").strip().lower()
+        action = (payload.get("mode") or payload.get("action") or "").strip()
+        selected_refs = [r.strip() for r in (payload.get("selected_refs") or []) if isinstance(r, str) and r.strip()]
+        selected_examples = []
+        for entry in payload.get("selections", []):
+            if not isinstance(entry, dict):
+                continue
+            ref = (entry.get("ref") or "").strip()
+            example = (entry.get("value") or "").strip()
+            if ref and example:
+                selected_examples.append(json.dumps({"ref": ref, "example": example}))
+        provider_model = payload.get("provider_model") or "OpenAI|gpt-4o-mini"
+        context = payload.get("context") or ""
+        results_raw = json.dumps(payload.get("results") or [])
+    else:
+        refs_raw = request.values.get("refs") or "[]"
+        target_language = (request.values.get("target_language") or "").strip().lower()
+        action = ""
+        selected_refs = [r.strip() for r in (request.form.getlist("selected_ref") or []) if r.strip()]
+        selected_examples = [t for t in (request.form.getlist("selected_example") or []) if t.strip()]
+        provider_model = request.values.get("provider_model") or "OpenAI|gpt-4o-mini"
+        context = request.values.get("context") or ""
+        results_raw = request.values.get("results_json") or "[]"
 
     try:
         ai_results = json.loads(results_raw)
@@ -200,12 +220,15 @@ def missing_usage_examples_output():
                 glosses.append(gloss)
 
     settings = current_app.extensions["settings_store"].load()
-    provider, model = provider_model.split("|", 1)
+    if "|" in provider_model:
+        provider, model = provider_model.split("|", 1)
+    else:
+        provider, model = provider_model, ""
 
-    if request.method == "POST":
+    if json_mode:
         if not target_language:
             ai_error = "target_language is required."
-        elif action == "mark_impossible":
+        elif action in ("mark_impossible",):
             for ref in selected_refs:
                 gloss = storage.resolve_reference(ref)
                 if gloss:
@@ -214,7 +237,7 @@ def missing_usage_examples_output():
                     gloss.logs = logs
                     storage.save_gloss(gloss)
             glosses = [g for g in glosses if should_add_usage_examples(g, target_language)]
-        elif action == "ai_generate":
+        elif action in ("ai_generate", "generate"):
             if not selected_refs:
                 ai_error = "Select glosses to generate examples for."
             elif provider != "OpenAI":
@@ -237,13 +260,13 @@ def missing_usage_examples_output():
                     })
                 if not ai_results:
                     ai_error = "No eligible glosses found to generate examples."
-        elif action in ("ai_accept_all", "ai_accept_selection"):
+        elif action in ("ai_accept_all", "ai_accept_selection", "accept_all", "accept_selection"):
             if not ai_results:
                 ai_error = "No AI results to accept."
             else:
                 added = 0
                 selection_map: dict[str, list[str]] = {}
-                if action == "ai_accept_selection":
+                if action in ("ai_accept_selection", "accept_selection"):
                     for val in selected_examples:
                         try:
                             entry = json.loads(val)
@@ -262,7 +285,7 @@ def missing_usage_examples_output():
                     if not gloss:
                         continue
                     examples = item.get("examples") or []
-                    chosen = examples if action == "ai_accept_all" else selection_map.get(ref, [])
+                    chosen = examples if action in ("ai_accept_all", "accept_all") else selection_map.get(ref, [])
                     for ex_text in chosen:
                         ex_text = ex_text.strip()
                         if not ex_text:
@@ -272,19 +295,22 @@ def missing_usage_examples_output():
                         added += 1
                 ai_results = []
                 ai_message = f"Added {added} usage examples." if added else "No usage examples added."
-        elif action == "ai_discard":
+        elif action in ("ai_discard", "discard"):
             ai_results = []
 
-    ai_results_json = json.dumps(ai_results)
+    if json_mode:
+        status = 200 if not ai_error else 400
+        return {
+            "ai_results": ai_results,
+            "ai_error": ai_error,
+            "ai_message": ai_message,
+        }, status
+
     return render_template(
         "tool_missing_usage_examples/output_form.html",
         glosses=glosses,
         refs_json=refs_raw,
         provider_model=provider_model,
         context=context,
-        ai_results=ai_results,
-        ai_results_json=ai_results_json,
-        ai_error=ai_error,
-        ai_message=ai_message,
         target_language=target_language,
     )

@@ -5,7 +5,7 @@
     <h1 class="text-2xl font-bold">Missing usage examples (auto)</h1>
     <p class="text-sm text-base-content/70">Generate examples for glosses in {{ target_language }}.</p>
   </div>
-  <form method="post" action="{{ url_for('tools.missing_usage_examples_output') }}" class="space-y-4">
+  <form method="get" action="{{ url_for('tools.missing_usage_examples_output') }}" class="space-y-4">
     <input type="hidden" name="refs" value='{{ refs_json }}'>
     <label class="form-control">
       <div class="label"><span class="label-text font-semibold">Target language</span></div>

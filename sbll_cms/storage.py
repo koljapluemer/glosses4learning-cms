@@ -53,6 +53,10 @@ class GlossStorage:
             data = json.load(handle)
         return Gloss.from_dict(data, slug=slug, language=language)
 
+    def find_gloss_by_slug(self, language: str, slug: str) -> Gloss | None:
+        """Alias kept for backwards-compatibility; normalizes language then loads."""
+        return self.load_gloss(normalize_language_code(language), slug)
+
     def create_gloss(self, gloss: Gloss) -> Gloss:
         slug = derive_slug(gloss.content)
         if not slug:
