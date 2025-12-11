@@ -27,7 +27,8 @@ from src.tui.flows.flow_split_glosses_of_situation_into_parts_ai import (
 )
 from src.tui.flows.flow_export_situations_batch import flow_export_situations_batch
 from src.tui.flows.flow_translate_untranslated_native_ai import flow_translate_untranslated_native_ai
-from src.tui.flows.flow_translate_untranslated_target_ai import flow_translate_untranslated_target_ai
+from src.tui.flows.flow_translate_paraphrases_to_target_ai import flow_translate_paraphrases_to_target_ai
+from src.tui.flows.flow_translate_regular_to_target_ai import flow_translate_regular_to_target_ai
 
 
 def ensure_context(storage: GlossStorage):
@@ -64,7 +65,8 @@ def main_menu(storage: GlossStorage):
                 ("add_understand_manual", "Add understand goals (manual, target language)"),
                 ("add_usage_ai", "Add usage examples (AI, target language)"),
                 ("translate_native", "Translate target glosses to native (AI)"),
-                ("translate_target", "Translate native glosses to target (AI)"),
+                ("translate_paraphrases_to_target", "Translate paraphrases: native → target (AI)"),
+                ("translate_regular_to_target", "Translate regular: native → target (AI)"),
                 ("split_parts", "Split glosses into parts (AI)"),
                 ("batch_export", "Batch export situations"),
                 ("set_situation", "Change situation / languages"),
@@ -89,8 +91,10 @@ def main_menu(storage: GlossStorage):
             flow_add_usage_examples_ai(storage, state)
         elif selection == "translate_native":
             flow_translate_untranslated_native_ai(storage, state)
-        elif selection == "translate_target":
-            flow_translate_untranslated_target_ai(storage, state)
+        elif selection == "translate_paraphrases_to_target":
+            flow_translate_paraphrases_to_target_ai(storage, state)
+        elif selection == "translate_regular_to_target":
+            flow_translate_regular_to_target_ai(storage, state)
         elif selection == "split_parts":
             flow_split_glosses_of_situation_into_parts_ai(storage, state)
         elif selection == "batch_export":
