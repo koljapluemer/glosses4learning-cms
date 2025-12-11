@@ -15,7 +15,7 @@ If all true:
 - the goal expression is in the target lang
 - the goal expression itself is translated into the native lang at least once
 - the goal expression has >0 `parts`
-- each of these `parts` has >0 `translations` back into the target lang that is *not* tagged `eng:paraphrase`
+- each of these `parts` has >0 `translations` back into the native lang
 
 ### Green
 

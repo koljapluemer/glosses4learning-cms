@@ -90,11 +90,11 @@ def evaluate_goal_state(gloss: Gloss, storage: GlossStorage, native_language: st
         c_parts = _check("goal has parts", bool(parts), missing=[goal_ref])
         missing_parts_trans: list[str] = []
         for part in parts:
-            part_trans = _translation_refs(part, target, require_non_paraphrase=True)
+            part_trans = _translation_refs(part, native)
             if len(part_trans) < 1:
                 missing_parts_trans.append(f"{part.language}:{part.slug or part.content}")
         c_parts_trans = _check(
-            "each part has >=1 translation to target (non-paraphrase)",
+            "each part has >=1 translation to native",
             not missing_parts_trans,
             missing=missing_parts_trans,
         )
