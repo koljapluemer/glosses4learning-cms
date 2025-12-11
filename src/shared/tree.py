@@ -2,11 +2,24 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.shared.storage import Gloss, GlossStorage
+from src.shared.storage import Gloss, GlossStorage, normalize_language_code
 
 SPLIT_LOG_MARKER = "SPLIT_CONSIDERED_UNNECESSARY"
 TRANSLATION_IMPOSSIBLE_MARKER = "TRANSLATION_CONSIDERED_IMPOSSIBLE"
 USAGE_IMPOSSIBLE_MARKER = "USAGE_EXAMPLE_CONSIDERED_IMPOSSIBLE"
+
+
+def detect_goal_type(gloss: Gloss, native_language: str, target_language: str) -> str | None:
+    """Return normalized goal type for situation children or None if not a goal."""
+    lang = normalize_language_code(gloss.language)
+    native = normalize_language_code(native_language)
+    target = normalize_language_code(target_language)
+    tags = gloss.tags or []
+    if lang == native and "eng:procedural-paraphrase-expression-goal" in tags:
+        return "procedural"
+    if lang == target and "eng:understand-expression-goal" in tags:
+        return "understanding"
+    return None
 
 
 def paraphrase_display(gloss: Gloss) -> str:
@@ -17,6 +30,8 @@ def paraphrase_display(gloss: Gloss) -> str:
 
 
 def build_goal_nodes(situation: Gloss, storage: GlossStorage, native_language: str, target_language: str):
+    native_language = normalize_language_code(native_language)
+    target_language = normalize_language_code(target_language)
     stats = {
         "situation_glosses": set(),
         "glosses_to_learn": set(),
@@ -168,13 +183,13 @@ def build_goal_nodes(situation: Gloss, storage: GlossStorage, native_language: s
         gloss = storage.resolve_reference(ref)
         if not gloss:
             continue
-        tags = gloss.tags or []
+        goal_kind = detect_goal_type(gloss, native_language, target_language)
         marker = ""
-        if gloss.language == native_language and "eng:procedural-paraphrase-expression-goal" in tags:
+        if goal_kind == "procedural":
             marker = "PROC "
             learn_lang = native_language
             goal_type = "procedural"
-        elif gloss.language == target_language and "eng:understand-expression-goal" in tags:
+        elif goal_kind == "understanding":
             marker = "UNDR "
             learn_lang = target_language
             goal_type = "understand"

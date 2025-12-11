@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.12/dist/full.min.css" rel="stylesheet" type="text/css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <title>Situation Goals — Choose languages</title>
+</head>
+<body class="min-h-screen bg-base-200 text-base-content">
+  <div class="navbar bg-base-100 shadow">
+    <div class="flex-1 px-4">
+      <div class="flex items-center gap-2 text-xl font-semibold">
+        <i data-lucide="list"></i>
+        <span>Situation Goals</span>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-3xl mx-auto px-4 py-8 space-y-6">
+    <div class="space-y-1">
+      <h1 class="text-3xl font-semibold">Choose languages</h1>
+      <p class="text-light">Pick native and target languages to view the situations and their goals.</p>
+    </div>
+
+    <form method="post" class="bg-base-100 rounded-box shadow p-6 space-y-4">
+      <div class="grid gap-4 md:grid-cols-2">
+        <fieldset class="fieldset">
+          <label for="native" class="label">Native language</label>
+          <select id="native" name="native" class="select select-bordered w-full" required>
+            {% for lang in languages %}
+              <option value="{{ lang.code }}" {% if lang.code == native_language %}selected{% endif %}>{{ lang.label }} ({{ lang.code }})</option>
+            {% endfor %}
+          </select>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <label for="target" class="label">Target language</label>
+          <select id="target" name="target" class="select select-bordered w-full" required>
+            {% for lang in languages %}
+              <option value="{{ lang.code }}" {% if lang.code == target_language %}selected{% endif %}>{{ lang.label }} ({{ lang.code }})</option>
+            {% endfor %}
+          </select>
+        </fieldset>
+      </div>
+
+      <button type="submit" class="btn btn-primary">View situation goals</button>
+    </form>
+  </main>
+  <script>
+    const renderIcons = () => { if (window.lucide?.createIcons) { lucide.createIcons(); } };
+    document.addEventListener("DOMContentLoaded", renderIcons);
+  </script>
+</body>
+</html>
