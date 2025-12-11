@@ -45,6 +45,14 @@
               <ul class="space-y-2">
                 {% for item in row.goals %}
                   <li class="flex items-start gap-3">
+                    {% if item.state == "red" %}
+                      {% set state_class = "badge-error" %}
+                    {% elif item.state == "yellow" %}
+                      {% set state_class = "badge-warning" %}
+                    {% else %}
+                      {% set state_class = "badge-success" %}
+                    {% endif %}
+                    <span class="badge {{ state_class }} uppercase">{{ item.state }}</span>
                     <span class="text-light uppercase tracking-wide text-xs">{{ item.kind }}</span>
                     <span class="font-medium">{{ item.goal.content }}</span>
                   </li>

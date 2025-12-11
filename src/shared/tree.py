@@ -22,6 +22,89 @@ def detect_goal_type(gloss: Gloss, native_language: str, target_language: str) -
     return None
 
 
+def determine_goal_state(gloss: Gloss, storage: GlossStorage, native_language: str, target_language: str) -> str:
+    """
+    Compute RED/YELLOW/GREEN for a goal in the context of native/target languages.
+    Rules in doc/reference_what_is_a_valid_goal.md.
+    """
+    native = normalize_language_code(native_language)
+    target = normalize_language_code(target_language)
+    goal_lang = normalize_language_code(gloss.language)
+    tags = gloss.tags or []
+
+    def _translation_count(g: Gloss, lang: str, *, require_non_paraphrase: bool = False) -> int:
+        count = 0
+        for ref in getattr(g, "translations", []) or []:
+            ref_lang = ref.split(":", 1)[0].strip().lower()
+            if ref_lang != lang:
+                continue
+            t_gloss = storage.resolve_reference(ref)
+            if not t_gloss:
+                continue
+            if require_non_paraphrase and "eng:paraphrase" in (t_gloss.tags or []):
+                continue
+            count += 1
+        return count
+
+    def _parts() -> list[Gloss]:
+        items: list[Gloss] = []
+        for ref in getattr(gloss, "parts", []) or []:
+            p = storage.resolve_reference(ref)
+            if p:
+                items.append(p)
+        return items
+
+    goal_kind = detect_goal_type(gloss, native, target)
+    if goal_kind == "understanding":
+        yellow = True
+        yellow = yellow and goal_lang == target
+        yellow = yellow and _translation_count(gloss, native) >= 1
+        parts = _parts()
+        yellow = yellow and bool(parts)
+        if yellow:
+            for part in parts:
+                if _translation_count(part, target, require_non_paraphrase=True) <= 0:
+                    yellow = False
+                    break
+        if not yellow:
+            return "red"
+
+        green = _translation_count(gloss, native) >= 2
+        if green:
+            for part in parts:
+                usable_examples = 0
+                for u_ref in getattr(part, "usage_examples", []) or []:
+                    usage_gloss = storage.resolve_reference(u_ref)
+                    if not usage_gloss:
+                        continue
+                    if _translation_count(usage_gloss, native) >= 1:
+                        usable_examples += 1
+                if usable_examples < 2:
+                    green = False
+                    break
+        return "green" if green else "yellow"
+
+    if goal_kind == "procedural":
+        yellow = True
+        yellow = yellow and goal_lang == native
+        yellow = yellow and "eng:paraphrase" in tags
+        yellow = yellow and _translation_count(gloss, target) >= 1
+        parts = _parts()
+        yellow = yellow and bool(parts)
+        if yellow:
+            for part in parts:
+                if _translation_count(part, target, require_non_paraphrase=True) <= 0:
+                    yellow = False
+                    break
+        if not yellow:
+            return "red"
+
+        green = _translation_count(gloss, target) >= 2
+        return "green" if green else "yellow"
+
+    return "red"
+
+
 def paraphrase_display(gloss: Gloss) -> str:
     text = gloss.content or gloss.slug or ""
     if gloss.slug and gloss.slug not in text:
