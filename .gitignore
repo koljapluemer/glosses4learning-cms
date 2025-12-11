@@ -12,6 +12,8 @@ wheels/
 # TK tool state
 tools_tk/shared/state.json
 tools_tk/shared/settings.json
+tools_prompt/state.json
+tools_prompt/settings.json
 
 
 # Notebook artifacts
