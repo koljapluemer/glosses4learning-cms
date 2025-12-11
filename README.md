@@ -19,6 +19,7 @@ Tk tooling (standalone)
 Small Tk helper scripts live in `tools_tk/` and work directly on the same `data/` files:
 
 - `uv run python tools_tk/scripts/view_situation_tree.py` — pick a situation/native/target and view the goal tree + missing counts. Remembers your last selection in `tools_tk/shared/state.json` (gitignored).
+- `uv run python tools_tk/scripts/add_understand_expression_goals_for_situation.py` — generate and attach understand-expression goals (target language) to the selected situation; uses OpenAI if configured or simulated data otherwise.
 
 Notes
 -----
