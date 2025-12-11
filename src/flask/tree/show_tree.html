@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.12/dist/full.min.css" rel="stylesheet" type="text/css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <title>{{ title or "Situation Tree" }}</title>
+</head>
+<body class="min-h-screen bg-base-200 text-base-content">
+  <div class="navbar bg-base-100 shadow">
+    <div class="flex-1 px-4">
+      <div class="flex items-center gap-2 text-xl font-semibold">
+        <i data-lucide="trees"></i>
+        <span>Situation Tree</span>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-5xl mx-auto px-4 py-8 space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h1 class="text-3xl font-semibold">{{ title or "Situation Tree" }}</h1>
+        <p class="text-light">{{ info }}</p>
+      </div>
+      {% if situation %}
+        <div class="badge badge-outline">{{ situation.language }}:{{ situation.slug }}</div>
+      {% endif %}
+    </div>
+
+    {% if not nodes %}
+      <div class="alert">
+        <i data-lucide="alert-triangle"></i>
+        <span>No tree data available.</span>
+      </div>
+    {% else %}
+      <div class="card shadow">
+        <div class="card-body space-y-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="target"></i>
+            <h2 class="card-title">Goals</h2>
+          </div>
+          <div class="space-y-2">
+            {% macro icon_for_role(role) -%}
+              {% if role == 'part' or role == 'usage_part' %}layers{% elif role == 'usage' %}message-circle{% elif role == 'translation' %}languages{% else %}circle{% endif %}
+            {%- endmacro %}
+
+            {% macro render_node(node, depth=0) -%}
+              {% set has_children = node.children and node.children|length > 0 %}
+              <div class="w-full" style="margin-left: {{ depth * 1.25 }}rem;">
+                {% if has_children %}
+                  <div class="collapse collapse-plus bg-base-100 shadow">
+                    <input type="checkbox" />
+                    <div class="collapse-title flex items-center gap-2">
+                      {% if node.marker %}<span class="badge badge-outline">{{ node.marker }}</span>{% endif %}
+                      <i data-lucide="{{ icon_for_role(node.role) }}" class="w-4 h-4"></i>
+                      <span class="{{ 'font-semibold' if node.bold else '' }}">{{ node.gloss.content }}</span>
+                      {% if node.warn_native_missing or node.warn_target_missing %}<i data-lucide="languages" class="w-4 h-4 text-warning" title="Translation missing"></i>{% endif %}
+                      {% if node.warn_usage_missing %}<i data-lucide="message-square-warning" class="w-4 h-4 text-warning" title="Usage missing"></i>{% endif %}
+                      {% if node.warn_parts_missing %}<i data-lucide="layers" class="w-4 h-4 text-warning" title="Parts missing"></i>{% endif %}
+                    </div>
+                    <div class="collapse-content space-y-2">
+                      {% for child in node.children %}
+                        {{ render_node(child, depth + 1) }}
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="bg-base-100 shadow rounded-box px-3 py-2 flex items-center gap-2">
+                    {% if node.marker %}<span class="badge badge-outline">{{ node.marker }}</span>{% endif %}
+                    <i data-lucide="{{ icon_for_role(node.role) }}" class="w-4 h-4"></i>
+                    <span class="{{ 'font-semibold' if node.bold else '' }}">{{ node.gloss.content }}</span>
+                    {% if node.warn_native_missing or node.warn_target_missing %}<i data-lucide="languages" class="w-4 h-4 text-warning" title="Translation missing"></i>{% endif %}
+                    {% if node.warn_usage_missing %}<i data-lucide="message-square-warning" class="w-4 h-4 text-warning" title="Usage missing"></i>{% endif %}
+                    {% if node.warn_parts_missing %}<i data-lucide="layers" class="w-4 h-4 text-warning" title="Parts missing"></i>{% endif %}
+                  </div>
+                {% endif %}
+              </div>
+            {%- endmacro %}
+
+            {% for node in nodes %}
+              {{ render_node(node) }}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow">
+        <div class="card-body space-y-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="file-text"></i>
+            <h2 class="card-title">Raw text</h2>
+          </div>
+          <pre class="bg-base-300 rounded-box p-3 overflow-auto whitespace-pre-wrap">{{ tree_text }}</pre>
+        </div>
+      </div>
+    {% endif %}
+  </main>
+  <script>
+    const renderIcons = () => { if (window.lucide?.createIcons) { lucide.createIcons(); } };
+    document.addEventListener("DOMContentLoaded", renderIcons);
+  </script>
+</body>
+</html>
