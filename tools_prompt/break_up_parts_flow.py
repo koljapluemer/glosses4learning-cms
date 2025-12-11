@@ -5,7 +5,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from prompt_toolkit.shortcuts import checkboxlist_dialog, input_dialog, message_dialog
+import logging
+
+from prompt_toolkit.shortcuts import message_dialog, ProgressBar
 
 from tools_prompt.common import checkbox_dialog_default_checked
 from tools_prompt.settings_flow import ensure_api_key
@@ -114,14 +116,17 @@ def split_parts(api_key: str, gloss_content: str, language: str, context: str) -
 
 
 def break_up_parts_flow(storage: GlossStorage, state: dict[str, Any]):
+    logger = logging.getLogger(__name__)
     api_key = ensure_api_key()
     if not api_key:
-        message_dialog(title="Error", text="OPENAI_API_KEY required").run()
+        message_dialog(title="Error", text="OPENAI_API_KEY required (see logs for details)").run()
+        logger.error("OPENAI_API_KEY missing")
         return
 
     situation = storage.resolve_reference(state["situation_ref"])
     if not situation:
-        message_dialog(title="Error", text=f"Missing situation {state['situation_ref']}").run()
+        message_dialog(title="Error", text=f"Missing situation {state['situation_ref']} (see logs)").run()
+        logger.error("Missing situation %s", state["situation_ref"])
         return
 
     stats = collect_situation_stats(storage, situation, state["native_language"], state["target_language"])
@@ -130,36 +135,24 @@ def break_up_parts_flow(storage: GlossStorage, state: dict[str, Any]):
         message_dialog(title="Info", text="No glosses need splitting.").run()
         return
 
-    gloss_choices = []
-    for ref in refs:
-        g = storage.resolve_reference(ref)
-        gloss_choices.append((ref, f"{ref} — {g.content if g else '?'}"))
-
-    selected_refs = checkboxlist_dialog(
-        title="Select glosses to split",
-        text="Select glosses lacking parts",
-        values=gloss_choices,
-    ).run()
-    if not selected_refs:
-        return
-
-    ctx = input_dialog(title="Context", text="Extra context (optional):").run() or ""
-
     results = []
-    for ref in selected_refs:
-        gl = storage.resolve_reference(ref)
-        if not gl:
-            continue
-        can_split = judge_can_split(api_key, gl.content, gl.language, ctx)
-        if not can_split:
-            mark_split_unnecessary(storage, ref)
-            continue
-        parts = split_parts(api_key, gl.content, gl.language, ctx)
-        results.append((ref, gl.content, parts))
+    with ProgressBar(title="Splitting glosses") as pb:
+        for ref in pb(refs):
+            gl = storage.resolve_reference(ref)
+            if not gl:
+                continue
+            can_split = judge_can_split(api_key, gl.content, gl.language, "")
+            if not can_split:
+                mark_split_unnecessary(storage, ref)
+                continue
+            parts = split_parts(api_key, gl.content, gl.language, "")
+            results.append((ref, gl.content, parts))
 
     accepted_total = 0
+    errors: list[tuple[str, str, str]] = []
     for ref, content, parts in results:
         if not parts:
+            logger.info("No parts returned for %s (%s)", ref, content)
             continue
         selection = checkbox_dialog_default_checked(
             title=f"{ref}",
@@ -168,13 +161,31 @@ def break_up_parts_flow(storage: GlossStorage, state: dict[str, Any]):
             default_checked=parts,
         )
         if not selection:
+            logger.info("User skipped %s", ref)
             continue
         base = storage.resolve_reference(ref)
         if not base:
+            logger.error("Base gloss missing for ref %s", ref)
             continue
         for part_text in selection:
-            part_gloss = storage.ensure_gloss(base.language, part_text)
-            attach_relation(storage, base, "parts", part_gloss)
-            accepted_total += 1
+            part_text = (part_text or "").strip()
+            if not part_text:
+                errors.append((ref, "<empty>", "Empty part text"))
+                continue
+            try:
+                part_gloss = storage.ensure_gloss(base.language, part_text)
+                attach_relation(storage, base, "parts", part_gloss)
+                accepted_total += 1
+            except Exception as exc:  # noqa: BLE001
+                errors.append((ref, part_text, str(exc)))
+                logger.error("Failed to attach part for %s: '%s' -> %s", ref, part_text, exc)
 
-    message_dialog(title="Done", text=f"Added {accepted_total} parts.").run()
+    if errors:
+        for r, p, e in errors:
+            logger.error("Error for %s part '%s': %s", r, p, e)
+        message_dialog(
+            title="Done with errors",
+            text=f"Added {accepted_total} parts. Errors logged to console.",
+        ).run()
+    else:
+        message_dialog(title="Done", text=f"Added {accepted_total} parts.").run()

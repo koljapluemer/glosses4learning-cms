@@ -27,9 +27,24 @@ def normalize_language_code(code: str | None) -> str:
 
 
 def derive_slug(text: str) -> str:
-    text = (text or "").strip().lower()
-    text = re.sub(r"[^a-z0-9]+", "-", text)
-    text = re.sub(r"-+", "-", text).strip("-")
+    """
+    Build a filesystem-safe slug while preserving Unicode.
+    - Remove characters illegal on common filesystems: / \ ? * : | " < >
+    - Remove control chars
+    - Trim trailing dot/space (Windows)
+    - Truncate to a safe length (120 chars)
+    """
+    text = text or ""
+    # Remove illegal path characters
+    text = re.sub(r'[\\/\?\*\|":<>]', "", text)
+    # Remove control characters
+    text = "".join(ch for ch in text if ord(ch) >= 32)
+    # Trim trailing dot/space (Windows)
+    text = text.rstrip(" .")
+    if len(text) > 120:
+        text = text[:120].rstrip(" .")
+    if not text:
+        raise ValueError("Content must produce a valid slug.")
     return text
 
 
