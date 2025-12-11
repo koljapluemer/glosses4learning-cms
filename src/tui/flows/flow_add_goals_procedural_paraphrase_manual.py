@@ -44,10 +44,10 @@ def _textarea_dialog(title: str, text: str) -> str | None:
 
 def flow_add_goals_procedural_paraphrase_manual(storage: GlossStorage, state: dict) -> None:
     """
-    Manual entry of understand-expression goals in target language (one per line).
-    Tags: eng:understand-expression-goal
+    Manual entry of procedural paraphrase goals in the native language (one per line).
+    Tags: eng:paraphrase, eng:procedural-paraphrase-expression-goal
     """
-    target_language = state["target_language"]
+    native_language = state["native_language"]
     situation_ref = state["situation_ref"]
     situation = storage.resolve_reference(situation_ref)
     if not situation:
@@ -56,23 +56,30 @@ def flow_add_goals_procedural_paraphrase_manual(storage: GlossStorage, state: di
 
     text = _textarea_dialog(
         title="Add procedural paraphrase goals (manual)",
-        text=f"Enter one target-language expression per line (language: {target_language}):",
+        text=f"Enter one native-language procedural paraphrase per line (language: {native_language}):",
     )
     if not text:
         return
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if not lines:
-        message_dialog(title="Info", text="No expressions provided.").run()
+        message_dialog(title="Info", text="No goals provided.").run()
         return
 
     created = 0
     skipped = 0
     for content in lines:
-        existing = storage.find_gloss_by_content(target_language, content)
+        existing = storage.find_gloss_by_content(native_language, content)
         if existing:
             tags = existing.tags or []
-            if "eng:understand-expression-goal" not in tags:
-                existing.tags = tags + ["eng:understand-expression-goal"]
+            changed = False
+            if "eng:paraphrase" not in tags:
+                tags.append("eng:paraphrase")
+                changed = True
+            if "eng:procedural-paraphrase-expression-goal" not in tags:
+                tags.append("eng:procedural-paraphrase-expression-goal")
+                changed = True
+            if changed:
+                existing.tags = tags
                 storage.save_gloss(existing)
                 created += 1
             else:
@@ -80,7 +87,7 @@ def flow_add_goals_procedural_paraphrase_manual(storage: GlossStorage, state: di
             goal = existing
         else:
             goal = storage.create_gloss(
-                Gloss(content=content, language=target_language, tags=["eng:understand-expression-goal"])
+                Gloss(content=content, language=native_language, tags=["eng:paraphrase", "eng:procedural-paraphrase-expression-goal"])
             )
             created += 1
         attach_relation(storage, situation, "children", goal)

@@ -17,11 +17,16 @@ from src.tui.flows.flow_add_goals_expression_ai import flow_add_goals_expression
 from src.tui.flows.flow_add_goals_expression_manual import flow_add_goals_expression_manual
 from src.tui.flows.flow_add_goals_procedural_paraphrase_ai import flow_add_goals_procedural_paraphrase_ai
 from src.tui.flows.flow_add_goals_procedural_paraphrase_manual import flow_add_goals_procedural_paraphrase_manual
+from src.tui.flows.flow_add_situations_ai import flow_add_situations_ai
+from src.tui.flows.flow_add_situations_manual import flow_add_situations_manual
+from src.tui.flows.flow_add_usage_examples_ai import flow_add_usage_examples_ai
 from src.tui.flows.flow_set_settings import settings_flow
 from src.tui.flows.flow_set_situation import set_situation_flow
 from src.tui.flows.flow_split_glosses_of_situation_into_parts_ai import (
     flow_split_glosses_of_situation_into_parts_ai,
 )
+from src.tui.flows.flow_translate_untranslated_native_ai import flow_translate_untranslated_native_ai
+from src.tui.flows.flow_translate_untranslated_target_ai import flow_translate_untranslated_target_ai
 
 
 def ensure_context(storage: GlossStorage):
@@ -50,10 +55,15 @@ def main_menu(storage: GlossStorage):
         selection = choice(
             message=title,
             options=[
+                ("add_situation_ai", "Add situations (AI)"),
+                ("add_situation_manual", "Add situations (manual)"),
                 ("add_expr_ai", "Add expression goals (AI, native language)"),
                 ("add_expr_manual", "Add expression goals (manual, native language)"),
                 ("add_understand_ai", "Add understand goals (AI, target language)"),
                 ("add_understand_manual", "Add understand goals (manual, target language)"),
+                ("add_usage_ai", "Add usage examples (AI, target language)"),
+                ("translate_native", "Translate target glosses to native (AI)"),
+                ("translate_target", "Translate native glosses to target (AI)"),
                 ("split_parts", "Split glosses into parts (AI)"),
                 ("set_situation", "Change situation / languages"),
                 ("settings", "Settings (API key)"),
@@ -61,7 +71,11 @@ def main_menu(storage: GlossStorage):
             ],
             default="quit",
         )
-        if selection == "add_expr_ai":
+        if selection == "add_situation_ai":
+            flow_add_situations_ai(storage, state)
+        elif selection == "add_situation_manual":
+            flow_add_situations_manual(storage, state)
+        elif selection == "add_expr_ai":
             flow_add_goals_expression_ai(storage, state)
         elif selection == "add_expr_manual":
             flow_add_goals_expression_manual(storage, state)
@@ -69,6 +83,12 @@ def main_menu(storage: GlossStorage):
             flow_add_goals_procedural_paraphrase_ai(storage, state)
         elif selection == "add_understand_manual":
             flow_add_goals_procedural_paraphrase_manual(storage, state)
+        elif selection == "add_usage_ai":
+            flow_add_usage_examples_ai(storage, state)
+        elif selection == "translate_native":
+            flow_translate_untranslated_native_ai(storage, state)
+        elif selection == "translate_target":
+            flow_translate_untranslated_target_ai(storage, state)
         elif selection == "split_parts":
             flow_split_glosses_of_situation_into_parts_ai(storage, state)
         elif selection == "set_situation":
