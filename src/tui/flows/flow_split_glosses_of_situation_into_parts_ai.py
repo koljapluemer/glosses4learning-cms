@@ -150,6 +150,7 @@ def flow_split_glosses_of_situation_into_parts_ai(storage: GlossStorage, state: 
             title=ref,
             text=f"{content}\nSelect parts to attach:",
             values=[(p, p) for p in parts],
+            default_values=list(parts),
         ).run()
         if selection is None:
             logger.info("User canceled selection for %s", ref)

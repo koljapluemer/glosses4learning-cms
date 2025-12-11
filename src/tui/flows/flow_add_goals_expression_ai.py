@@ -97,10 +97,12 @@ def flow_add_goals_expression_ai(storage: GlossStorage, state: dict) -> None:
         message_dialog(title="Info", text="No goals generated.").run()
         return
 
+    # Preselect all by default
     selection = checkboxlist_dialog(
         title="Select goals to add",
         text="Accept goals to add to the situation",
         values=[(g, g) for g in goals],
+        default_values=list(goals),
     ).run()
     if not selection:
         return

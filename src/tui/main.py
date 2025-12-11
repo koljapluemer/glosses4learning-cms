@@ -15,6 +15,8 @@ from src.shared.state import load_state, save_state
 from src.shared.storage import GlossStorage
 from src.tui.flows.flow_add_goals_expression_ai import flow_add_goals_expression_ai
 from src.tui.flows.flow_add_goals_expression_manual import flow_add_goals_expression_manual
+from src.tui.flows.flow_add_goals_procedural_paraphrase_ai import flow_add_goals_procedural_paraphrase_ai
+from src.tui.flows.flow_add_goals_procedural_paraphrase_manual import flow_add_goals_procedural_paraphrase_manual
 from src.tui.flows.flow_set_settings import settings_flow
 from src.tui.flows.flow_set_situation import set_situation_flow
 from src.tui.flows.flow_split_glosses_of_situation_into_parts_ai import (
@@ -48,8 +50,10 @@ def main_menu(storage: GlossStorage):
         selection = choice(
             message=title,
             options=[
-                ("add_expr_ai", "Add expression goals (AI)"),
-                ("add_expr_manual", "Add expression goals (manual)"),
+                ("add_expr_ai", "Add expression goals (AI, native language)"),
+                ("add_expr_manual", "Add expression goals (manual, native language)"),
+                ("add_understand_ai", "Add understand goals (AI, target language)"),
+                ("add_understand_manual", "Add understand goals (manual, target language)"),
                 ("split_parts", "Split glosses into parts (AI)"),
                 ("set_situation", "Change situation / languages"),
                 ("settings", "Settings (API key)"),
@@ -61,6 +65,10 @@ def main_menu(storage: GlossStorage):
             flow_add_goals_expression_ai(storage, state)
         elif selection == "add_expr_manual":
             flow_add_goals_expression_manual(storage, state)
+        elif selection == "add_understand_ai":
+            flow_add_goals_procedural_paraphrase_ai(storage, state)
+        elif selection == "add_understand_manual":
+            flow_add_goals_procedural_paraphrase_manual(storage, state)
         elif selection == "split_parts":
             flow_split_glosses_of_situation_into_parts_ai(storage, state)
         elif selection == "set_situation":
