@@ -14,7 +14,9 @@ from tools_tk.shared.gloss_storage import GlossStorage
 
 def main():
     storage = GlossStorage(REPO_ROOT / "data")
-    main_menu(storage)
+    res = main_menu(storage)
+    if res == "exit":
+        return
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from prompt_toolkit.shortcuts import radiolist_dialog
+from prompt_toolkit.shortcuts import choice
 
 from tools_prompt.common import load_json, save_json
 from tools_tk.shared.gloss_storage import GlossStorage
@@ -25,12 +25,12 @@ def pick_situation(storage: GlossStorage):
     if not situations:
         return None
     values = [(f"{g.language}:{g.slug}", f"{g.content} [{g.language}:{g.slug}]") for g in situations]
-    return radiolist_dialog(title="Select situation", text="Choose a situation", values=values).run()
+    return choice(message="Select situation", options=values, default=values[0][0] if values else None)
 
 
 def pick_language(title: str, languages: list[str]):
     values = [(lang, lang) for lang in languages]
-    return radiolist_dialog(title=title, text=title, values=values).run()
+    return choice(message=title, options=values, default=values[0][0] if values else None)
 
 
 def set_situation_flow(storage: GlossStorage) -> dict[str, Any] | None:

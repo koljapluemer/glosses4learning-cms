@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from prompt_toolkit.shortcuts import message_dialog, radiolist_dialog
+from prompt_toolkit.shortcuts import choice, message_dialog
 
 from tools_prompt.break_up_parts_flow import break_up_parts_flow
 from tools_prompt.settings_flow import ensure_api_key, settings_flow
@@ -24,27 +24,31 @@ def main_menu(storage: GlossStorage):
         if not state:
             return
         title = f"Menu — Situation: {state['situation_ref']} | Native: {state['native_language']} | Target: {state['target_language']}"
-        choice = radiolist_dialog(
-            title=title,
-            text="Select an action",
-            values=[
+        selection = choice(
+            message=title,
+            options=[
                 ("tree", "View situation tree"),
                 ("break", "Automatically break up glosses into parts"),
                 ("set_situation", "Change situation / languages"),
                 ("settings", "Settings (API key)"),
                 ("quit", "Quit"),
+                ("exit", "Exit program"),
             ],
-        ).run()
-        if choice == "tree":
+            default="break",
+        )
+        if selection == "tree":
             tree_view_flow(storage, state)
-        elif choice == "break":
+        elif selection == "break":
             break_up_parts_flow(storage, state)
-        elif choice == "set_situation":
+        elif selection == "set_situation":
             state = set_situation_flow(storage) or {}
             save_state(state)
-        elif choice == "settings":
+        elif selection == "settings":
             settings_flow()
-        elif choice == "quit":
+        elif selection == "quit":
             return
+        elif selection == "exit":
+            # Return a sentinel to end the whole program.
+            return "exit"
         else:
             message_dialog(title="Info", text="No action selected.").run()
