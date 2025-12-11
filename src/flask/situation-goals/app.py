@@ -18,7 +18,7 @@ if str(REPO_ROOT) not in sys.path:
 from src.shared.languages import load_language  # noqa: E402
 from src.shared.log import configure_logging  # noqa: E402
 from src.shared.storage import Gloss, GlossStorage, normalize_language_code  # noqa: E402
-from src.shared.tree import detect_goal_type, determine_goal_state  # noqa: E402
+from src.shared.tree import detect_goal_type, evaluate_goal_state  # noqa: E402
 
 configure_logging()
 storage = GlossStorage(REPO_ROOT / "data")
@@ -88,8 +88,10 @@ def list_situations():
             if not kind:
                 continue
             display_kind = "paraphrased-expression" if kind == "procedural" else "understanding"
-            state = determine_goal_state(goal, storage, native_language, target_language)
-            goals.append({"goal": goal, "kind": display_kind, "state": state})
+            state_info = evaluate_goal_state(goal, storage, native_language, target_language)
+            state_value = state_info.get("state", "red")
+            state_log = state_info.get("log", "")
+            goals.append({"goal": goal, "kind": display_kind, "state": state_value, "log": state_log})
         goals.sort(key=lambda g: (g["kind"], g["goal"].content.lower()))
         situation_rows.append({"situation": situation, "goals": goals})
 

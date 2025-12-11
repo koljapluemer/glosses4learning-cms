@@ -22,9 +22,10 @@ def detect_goal_type(gloss: Gloss, native_language: str, target_language: str) -
     return None
 
 
-def determine_goal_state(gloss: Gloss, storage: GlossStorage, native_language: str, target_language: str) -> str:
+def evaluate_goal_state(gloss: Gloss, storage: GlossStorage, native_language: str, target_language: str) -> dict[str, str | list[str]]:
     """
-    Compute RED/YELLOW/GREEN for a goal in the context of native/target languages.
+    Compute RED/YELLOW/GREEN for a goal in the context of native/target languages and
+    return a detailed log of checks.
     Rules in doc/reference_what_is_a_valid_goal.md.
     """
     native = normalize_language_code(native_language)
@@ -32,8 +33,8 @@ def determine_goal_state(gloss: Gloss, storage: GlossStorage, native_language: s
     goal_lang = normalize_language_code(gloss.language)
     tags = gloss.tags or []
 
-    def _translation_count(g: Gloss, lang: str, *, require_non_paraphrase: bool = False) -> int:
-        count = 0
+    def _translation_refs(g: Gloss, lang: str, *, require_non_paraphrase: bool = False) -> list[str]:
+        matches: list[str] = []
         for ref in getattr(g, "translations", []) or []:
             ref_lang = ref.split(":", 1)[0].strip().lower()
             if ref_lang != lang:
@@ -43,8 +44,8 @@ def determine_goal_state(gloss: Gloss, storage: GlossStorage, native_language: s
                 continue
             if require_non_paraphrase and "eng:paraphrase" in (t_gloss.tags or []):
                 continue
-            count += 1
-        return count
+            matches.append(f"{t_gloss.language}:{t_gloss.slug or t_gloss.content}")
+        return matches
 
     def _parts() -> list[Gloss]:
         items: list[Gloss] = []
@@ -55,54 +56,131 @@ def determine_goal_state(gloss: Gloss, storage: GlossStorage, native_language: s
         return items
 
     goal_kind = detect_goal_type(gloss, native, target)
-    if goal_kind == "understanding":
-        yellow = True
-        yellow = yellow and goal_lang == target
-        yellow = yellow and _translation_count(gloss, native) >= 1
-        parts = _parts()
-        yellow = yellow and bool(parts)
-        if yellow:
-            for part in parts:
-                if _translation_count(part, target, require_non_paraphrase=True) <= 0:
-                    yellow = False
-                    break
-        if not yellow:
-            return "red"
+    goal_ref = f"{gloss.language}:{gloss.slug or gloss.content}"
+    lines: list[str] = [
+        f"goal={goal_ref}",
+        f"kind={goal_kind or 'unknown'}",
+        f"native={native}",
+        f"target={target}",
+    ]
 
-        green = _translation_count(gloss, native) >= 2
-        if green:
+    def _section(title: str):
+        lines.append(f"{title}:")
+
+    def _check(desc: str, passed: bool, missing: list[str] | None = None):
+        lines.append(f"- [{'x' if passed else ' '}] {desc}")
+        if not passed and missing:
+            for item in missing:
+                lines.append(f"  missing: {item}")
+        return passed
+
+    yellow_ok = False
+    green_ok = False
+
+    if goal_kind == "understanding":
+        _section("yellow_requirements")
+        c_lang = _check("goal expression is in target language", goal_lang == target, missing=[goal_ref])
+        goal_native_trans = _translation_refs(gloss, native)
+        c_t1 = _check(
+            "goal has >=1 translation into native",
+            len(goal_native_trans) >= 1,
+            missing=[goal_ref] if len(goal_native_trans) < 1 else None,
+        )
+        parts = _parts()
+        c_parts = _check("goal has parts", bool(parts), missing=[goal_ref])
+        missing_parts_trans: list[str] = []
+        for part in parts:
+            part_trans = _translation_refs(part, target, require_non_paraphrase=True)
+            if len(part_trans) < 1:
+                missing_parts_trans.append(f"{part.language}:{part.slug or part.content}")
+        c_parts_trans = _check(
+            "each part has >=1 translation to target (non-paraphrase)",
+            not missing_parts_trans,
+            missing=missing_parts_trans,
+        )
+        yellow_ok = all([c_lang, c_t1, c_parts, c_parts_trans])
+
+        _section("green_requirements")
+        if yellow_ok:
+            c_t2 = _check(
+                "goal has >=2 translations into native",
+                len(goal_native_trans) >= 2,
+                missing=[goal_ref],
+            )
+            missing_parts_usage: list[str] = []
             for part in parts:
-                usable_examples = 0
+                usable_examples = []
+                lacking_examples = []
                 for u_ref in getattr(part, "usage_examples", []) or []:
                     usage_gloss = storage.resolve_reference(u_ref)
                     if not usage_gloss:
+                        lacking_examples.append(f"{u_ref} (missing gloss)")
                         continue
-                    if _translation_count(usage_gloss, native) >= 1:
-                        usable_examples += 1
-                if usable_examples < 2:
-                    green = False
-                    break
-        return "green" if green else "yellow"
+                    if _translation_refs(usage_gloss, native):
+                        usable_examples.append(f"{usage_gloss.language}:{usage_gloss.slug or usage_gloss.content}")
+                    else:
+                        lacking_examples.append(f"{usage_gloss.language}:{usage_gloss.slug or usage_gloss.content}")
+                if len(usable_examples) < 2:
+                    detail = f"{part.language}:{part.slug or part.content} (usable: {', '.join(usable_examples) or 'none'}; lacking native translation on: {', '.join(lacking_examples) or 'none'})"
+                    missing_parts_usage.append(detail)
+            c_parts_usage = _check(
+                "each part has >=2 usage examples translated once to native",
+                not missing_parts_usage,
+                missing=missing_parts_usage,
+            )
+            green_ok = c_t2 and c_parts_usage
+        else:
+            _check("reach yellow first", False, missing=[goal_ref])
 
-    if goal_kind == "procedural":
-        yellow = True
-        yellow = yellow and goal_lang == native
-        yellow = yellow and "eng:paraphrase" in tags
-        yellow = yellow and _translation_count(gloss, target) >= 1
+    elif goal_kind == "procedural":
+        _section("yellow_requirements")
+        c_lang = _check("goal expression is in native language", goal_lang == native, missing=[goal_ref])
+        c_tag = _check("goal tagged eng:paraphrase", "eng:paraphrase" in tags, missing=[goal_ref])
+        goal_target_trans = _translation_refs(gloss, target)
+        c_t1 = _check(
+            "goal has >=1 translation into target",
+            len(goal_target_trans) >= 1,
+            missing=[goal_ref],
+        )
         parts = _parts()
-        yellow = yellow and bool(parts)
-        if yellow:
-            for part in parts:
-                if _translation_count(part, target, require_non_paraphrase=True) <= 0:
-                    yellow = False
-                    break
-        if not yellow:
-            return "red"
+        c_parts = _check("goal has parts", bool(parts), missing=[goal_ref])
+        missing_parts_trans: list[str] = []
+        for part in parts:
+            part_trans = _translation_refs(part, target, require_non_paraphrase=True)
+            if len(part_trans) < 1:
+                missing_parts_trans.append(f"{part.language}:{part.slug or part.content}")
+        c_parts_trans = _check(
+            "each part has >=1 translation to target (non-paraphrase)",
+            not missing_parts_trans,
+            missing=missing_parts_trans,
+        )
+        yellow_ok = all([c_lang, c_tag, c_t1, c_parts, c_parts_trans])
 
-        green = _translation_count(gloss, target) >= 2
-        return "green" if green else "yellow"
+        _section("green_requirements")
+        if yellow_ok:
+            c_t2 = _check(
+                "goal has >=2 translations into target",
+                len(goal_target_trans) >= 2,
+                missing=[goal_ref],
+            )
+            green_ok = c_t2
+        else:
+            _check("reach yellow first", False, missing=[goal_ref])
 
-    return "red"
+    else:
+        _section("yellow_requirements")
+        _check("goal matches expected kind for native/target languages", False, missing=[goal_ref])
+        _section("green_requirements")
+        _check("reach yellow first", False, missing=[goal_ref])
+
+    state = "green" if green_ok else "yellow" if yellow_ok else "red"
+    lines.append(f"state={state}")
+    return {"state": state, "log": "\n".join(lines)}
+
+
+def determine_goal_state(gloss: Gloss, storage: GlossStorage, native_language: str, target_language: str) -> str:
+    """Backward-compatible helper returning only the state."""
+    return evaluate_goal_state(gloss, storage, native_language, target_language)["state"]
 
 
 def paraphrase_display(gloss: Gloss) -> str:
