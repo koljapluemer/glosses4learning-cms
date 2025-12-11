@@ -8,58 +8,47 @@
     </div>
     <a href="{{ url_for('create_gloss') }}" class="btn btn-primary gap-2">
       <i data-lucide="plus"></i>
-      <span>Add gloss</span>
+      <span>Add Gloss</span>
     </a>
   </div>
 
   {% if grouped_glosses %}
-    <div class="grid md:grid-cols-2 gap-4">
-      {% for language, glosses in grouped_glosses %}
-        <div class="card shadow">
-          <div class="card-body space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <div class="badge badge-outline uppercase">{{ language }}</div>
-                <h2 class="card-title">{{ glosses|length }} gloss{{ 'es' if glosses|length != 1 else '' }}</h2>
-              </div>
-            </div>
-            <div class="overflow-x-auto">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>Content</th>
-                    <th class="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for gloss in glosses %}
-                    <tr class="hover:bg-base-200/60">
-                      <td class="whitespace-pre-line">
-                        <a href="{{ url_for('edit_gloss', language=gloss.language, slug=gloss.slug) }}" class="link link-hover">
-                          {{ gloss.content }}
-                        </a>
-                        <div class="text-light">{{ gloss.language }}:{{ gloss.slug }}</div>
-                      </td>
-                      <td class="text-right">
-                        <div class="flex justify-end gap-2">
-                          <a class="btn btn-ghost" href="{{ url_for('edit_gloss', language=gloss.language, slug=gloss.slug) }}">
-                            <i data-lucide="pencil"></i>
-                          </a>
-                          <form method="post" action="{{ url_for('delete_gloss', language=gloss.language, slug=gloss.slug) }}" onsubmit="return confirm('Delete this gloss?');">
-                            <button class="btn btn-ghost" type="submit">
-                              <i data-lucide="trash-2"></i>
-                            </button>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      {% endfor %}
+    <div class="overflow-x-auto">
+      <table class="table table-xs table-zebra rounded-box border border-base-content/5">
+        <thead>
+          <tr>
+            <th>Language</th>
+            <th>Content</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for language, glosses in grouped_glosses %}
+            {% for gloss in glosses %}
+              <tr class="">
+                <td class="uppercase">{{ language }}</td>
+                <td class="whitespace-pre-line">
+                  <a href="{{ url_for('edit_gloss', language=gloss.language, slug=gloss.slug) }}" class="link link-hover">
+                    {{ gloss.content }}
+                  </a>
+                </td>
+                <td class="text-right">
+                  <div class="flex justify-end gap-2">
+                    <a class="btn btn-sm" href="{{ url_for('edit_gloss', language=gloss.language, slug=gloss.slug) }}">
+                      <i data-lucide="pencil"></i>
+                    </a>
+                    <form method="post" action="{{ url_for('delete_gloss', language=gloss.language, slug=gloss.slug) }}" onsubmit="return confirm('Delete this gloss?');">
+                      <button class="btn btn-sm" type="submit">
+                        <i data-lucide="trash-2"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   {% else %}
     <div class="alert">

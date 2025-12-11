@@ -28,7 +28,7 @@ if str(REPO_ROOT) not in sys.path:
 from relations import RELATIONSHIP_FIELDS, WITHIN_LANGUAGE_RELATIONS, attach_relation, detach_relation, field_help_text, field_label, relation_rows  # type: ignore  # isort: skip
 from src.shared.languages import load_language
 from src.shared.log import configure_logging, get_logger
-from src.shared.storage import Gloss, GlossStorage, normalize_language_code
+from src.shared.storage import Gloss, GlossStorage, derive_slug, normalize_language_code
 
 configure_logging()
 logger = get_logger(__name__)
@@ -57,8 +57,6 @@ def _all_languages() -> list[dict[str, str]]:
                     "symbol": data.get("symbol") or data.get("Symbol") or "",
                 }
             )
-    if not any(lang["iso"] == "und" for lang in items):
-        items.insert(0, {"iso": "und", "name": "Undefined", "symbol": "UND"})
     return items
 
 
@@ -66,6 +64,8 @@ def _validate_language(value: str | None) -> str:
     value = normalize_language_code(value or "")
     if not LANG_PATTERN.match(value):
         raise ValueError("Language must be a 3-letter ISO code.")
+    if value == "und":
+        raise ValueError("Language cannot be undefined.")
     return value
 
 
@@ -98,6 +98,22 @@ def _grouped_glosses() -> list[tuple[str, list[Gloss]]]:
     return sorted(grouped.items(), key=lambda pair: pair[0])
 
 
+def _update_references(old_ref: str, new_ref: str) -> int:
+    touched = 0
+    for item in storage.list_glosses():
+        changed = False
+        for field in RELATIONSHIP_FIELDS:
+            refs: list[str] = list(getattr(item, field, []) or [])
+            if old_ref in refs:
+                refs = [new_ref if ref == old_ref else ref for ref in refs]
+                setattr(item, field, refs)
+                changed = True
+        if changed:
+            storage.save_gloss(item)
+            touched += 1
+    return touched
+
+
 def _render_relation_card(gloss: Gloss, field: str, message: str | None = None):
     rows = relation_rows(storage, gloss, field)
     return render_template(
@@ -125,7 +141,8 @@ def list_glosses():
 
 @app.route("/glosses/new", methods=["GET", "POST"])
 def create_gloss():
-    default_lang = request.args.get("lang", "").strip().lower() or "und"
+    languages = _all_languages()
+    default_lang = request.args.get("lang", "").strip().lower() or (languages[0]["iso"] if languages else "")
     form_language = default_lang
     form_content = ""
     form_transcriptions = ""
@@ -155,7 +172,7 @@ def create_gloss():
         "gloss_form.html",
         gloss=gloss,
         mode="create",
-        languages=_all_languages(),
+        languages=languages,
     )
 
 
@@ -168,8 +185,30 @@ def edit_gloss(language: str, slug: str):
         if not gloss.content:
             flash("Content is required.", "error")
         else:
+            old_slug = gloss.slug or slug
+            new_slug = derive_slug(gloss.content)
+            old_ref = f"{gloss.language}:{old_slug}"
+            new_ref = f"{gloss.language}:{new_slug}"
+
+            if new_slug != old_slug:
+                new_path = storage._path_for(gloss.language, new_slug)  # type: ignore[attr-defined]
+                if new_path.exists():
+                    flash("A gloss with this content already exists for this language.", "error")
+                    return render_template(
+                        "gloss_form.html",
+                        gloss=gloss,
+                        mode="edit",
+                        languages=_all_languages(),
+                        relation_fields=RELATIONSHIP_FIELDS,
+                    )
+                old_path = storage._path_for(gloss.language, old_slug)  # type: ignore[attr-defined]
+                old_path.rename(new_path)
+                gloss.slug = new_slug
+                updated_refs = _update_references(old_ref, new_ref)
+                flash(f"Saved. Updated {updated_refs} references after renaming.", "success")
+            else:
+                flash("Saved changes.", "success")
             storage.save_gloss(gloss)
-            flash("Saved changes.", "success")
             if request.form.get("next") == "list":
                 return redirect(url_for("list_glosses"))
     return render_template(

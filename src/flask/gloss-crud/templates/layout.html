@@ -13,17 +13,17 @@
   <div class="navbar bg-base-100 shadow sticky top-0 z-20">
     <div class="flex-1 px-4">
       <a href="{{ url_for('list_glosses') }}" class="flex items-center gap-2 text-xl font-semibold">
-        <i data-lucide="branches"></i>
+        <i class="w-4 h-4" data-lucide="branches"></i>
         <span>Gloss CRUD</span>
       </a>
     </div>
     <div class="flex-none gap-2 px-4">
       <a href="{{ url_for('list_glosses') }}" class="btn btn-ghost gap-2">
-        <i data-lucide="list"></i>
+        <i class="w-4 h-4" data-lucide="list"></i>
         <span>All glosses</span>
       </a>
       <a href="{{ url_for('create_gloss') }}" class="btn btn-primary gap-2">
-        <i data-lucide="plus"></i>
+        <i class="w-4 h-4" data-lucide="plus"></i>
         <span>New gloss</span>
       </a>
     </div>
@@ -35,7 +35,7 @@
         <div class="space-y-2">
           {% for category, message in messages %}
             <div class="alert {{ 'alert-success' if category == 'success' else 'alert-error' }}">
-              <i data-lucide="{{ 'check-circle' if category == 'success' else 'alert-triangle' }}"></i>
+              <i class="w-4 h-4" data-lucide="{{ 'check-circle' if category == 'success' else 'alert-triangle' }}"></i>
               <span>{{ message }}</span>
             </div>
           {% endfor %}
