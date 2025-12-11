@@ -15,6 +15,8 @@ tools_tk/shared/settings.json
 tools_prompt/state.json
 tools_prompt/settings.json
 tools_prompt/prompt.log
+src/shared/state.json
+src/shared/log_files/
 
 
 # Notebook artifacts
