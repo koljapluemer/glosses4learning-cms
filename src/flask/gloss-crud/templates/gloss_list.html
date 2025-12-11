@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+{% set title = "Glosses" %}
+{% block content %}
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-3xl font-semibold">Glosses</h1>
+      <p class="text-light">Grouped by ISO 639-3 language. Click a row to edit.</p>
+    </div>
+    <a href="{{ url_for('create_gloss') }}" class="btn btn-primary gap-2">
+      <i data-lucide="plus"></i>
+      <span>Add gloss</span>
+    </a>
+  </div>
+
+  {% if grouped_glosses %}
+    <div class="grid md:grid-cols-2 gap-4">
+      {% for language, glosses in grouped_glosses %}
+        <div class="card shadow">
+          <div class="card-body space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="badge badge-outline uppercase">{{ language }}</div>
+                <h2 class="card-title">{{ glosses|length }} gloss{{ 'es' if glosses|length != 1 else '' }}</h2>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Content</th>
+                    <th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for gloss in glosses %}
+                    <tr class="hover:bg-base-200/60">
+                      <td class="whitespace-pre-line">
+                        <a href="{{ url_for('edit_gloss', language=gloss.language, slug=gloss.slug) }}" class="link link-hover">
+                          {{ gloss.content }}
+                        </a>
+                        <div class="text-light">{{ gloss.language }}:{{ gloss.slug }}</div>
+                      </td>
+                      <td class="text-right">
+                        <div class="flex justify-end gap-2">
+                          <a class="btn btn-ghost" href="{{ url_for('edit_gloss', language=gloss.language, slug=gloss.slug) }}">
+                            <i data-lucide="pencil"></i>
+                          </a>
+                          <form method="post" action="{{ url_for('delete_gloss', language=gloss.language, slug=gloss.slug) }}" onsubmit="return confirm('Delete this gloss?');">
+                            <button class="btn btn-ghost" type="submit">
+                              <i data-lucide="trash-2"></i>
+                            </button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert">
+      <i data-lucide="info"></i>
+      <span>No glosses yet. Add your first one.</span>
+    </div>
+  {% endif %}
+{% endblock %}

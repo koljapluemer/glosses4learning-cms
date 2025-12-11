@@ -1,0 +1,80 @@
+<div class="card shadow" id="relation-card-{{ field }}">
+  <div class="card-body space-y-3">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="link"></i>
+          <h3 class="card-title">{{ label }}</h3>
+          <div class="badge badge-outline">{{ rows|length }}</div>
+        </div>
+        {% if help_text %}<p class="text-light">{{ help_text }}</p>{% endif %}
+      </div>
+      <div class="badge {{ 'badge-primary' if within_language else 'badge-outline' }}">
+        {{ 'Locked to ' ~ gloss.language if within_language else 'Cross-language' }}
+      </div>
+    </div>
+
+    {% if message %}
+      <div class="alert alert-info">
+        <i data-lucide="info"></i>
+        <span>{{ message }}</span>
+      </div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-2">
+      {% if rows %}
+        {% for row in rows %}
+          <div class="badge badge-outline gap-1 py-3 px-3">
+            <span class="font-semibold">{{ row.title }}</span>
+            <span class="text-light uppercase">{{ row.iso }}</span>
+            {% if row.missing %}<span class="text-light">missing</span>{% endif %}
+            <form method="post"
+                  hx-post="{{ url_for('remove_relation', language=gloss.language, slug=gloss.slug, field=field) }}"
+                  hx-target="#relation-card-{{ field }}"
+                  hx-swap="outerHTML">
+              <input type="hidden" name="ref" value="{{ row.ref }}">
+              <button type="submit" class="btn btn-ghost">
+                <i data-lucide="x"></i>
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-light">No relationships yet.</div>
+      {% endif %}
+    </div>
+
+    <div class="divider my-2">Add / attach</div>
+    <form id="add-form-{{ field }}"
+          class="space-y-2"
+          hx-post="{{ url_for('add_relation', language=gloss.language, slug=gloss.slug, field=field) }}"
+          hx-target="#relation-card-{{ field }}"
+          hx-swap="outerHTML">
+      <div class="join w-full">
+        {% if within_language %}
+          <span class="btn join-item btn-disabled uppercase">{{ gloss.language }}</span>
+          <input type="hidden" name="language" value="{{ gloss.language }}">
+        {% else %}
+          <select name="language" class="select select-bordered join-item">
+            {% for lang in languages %}
+              <option value="{{ lang.iso }}">{{ lang.symbol or lang.iso | upper }} — {{ lang.name }}</option>
+            {% endfor %}
+          </select>
+        {% endif %}
+        <input id="content-{{ field }}"
+               name="content"
+               class="input input-bordered join-item w-full"
+               placeholder="Type to attach existing or create new"
+               hx-get="{{ url_for('relation_search', language=gloss.language, slug=gloss.slug, field=field) }}"
+               hx-trigger="keyup changed delay:250ms"
+               hx-target="#suggestions-{{ field }}"
+               hx-swap="innerHTML"
+               hx-include="#add-form-{{ field }} [name='language']">
+        <button class="btn btn-primary join-item" type="submit">Add</button>
+      </div>
+      <p class="text-light">We try to attach an existing gloss (matching content &amp; language); otherwise a new one is created.</p>
+    </form>
+
+    <div id="suggestions-{{ field }}" class="space-y-1 text-light"></div>
+  </div>
+</div>
