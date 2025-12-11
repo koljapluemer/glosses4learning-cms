@@ -16,6 +16,7 @@ def configure_logging(level: int = logging.INFO) -> Path:
     """
     root = logging.getLogger()
     if not root.handlers:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
         handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
         fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
         handler.setFormatter(fmt)

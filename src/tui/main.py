@@ -13,8 +13,12 @@ from prompt_toolkit.shortcuts import choice, message_dialog
 from src.shared.log import configure_logging
 from src.shared.state import load_state, save_state
 from src.shared.storage import GlossStorage
+from src.tui.flows.flow_add_goals_expression_manual import flow_add_goals_expression_manual
 from src.tui.flows.flow_set_settings import settings_flow
 from src.tui.flows.flow_set_situation import set_situation_flow
+from src.tui.flows.flow_split_glosses_of_situation_into_parts_ai import (
+    flow_split_glosses_of_situation_into_parts_ai,
+)
 
 
 def ensure_context(storage: GlossStorage):
@@ -43,13 +47,19 @@ def main_menu(storage: GlossStorage):
         selection = choice(
             message=title,
             options=[
+                ("add_expr_manual", "Add expression goals (manual)"),
+                ("split_parts", "Split glosses into parts (AI)"),
                 ("set_situation", "Change situation / languages"),
                 ("settings", "Settings (API key)"),
                 ("quit", "Quit"),
             ],
             default="quit",
         )
-        if selection == "set_situation":
+        if selection == "add_expr_manual":
+            flow_add_goals_expression_manual(storage, state)
+        elif selection == "split_parts":
+            flow_split_glosses_of_situation_into_parts_ai(storage, state)
+        elif selection == "set_situation":
             new_state = set_situation_flow(storage, state)
             if new_state:
                 state.update(new_state)
