@@ -13,6 +13,7 @@ from prompt_toolkit.shortcuts import choice, message_dialog
 from src.shared.log import configure_logging
 from src.shared.state import load_state, save_state
 from src.shared.storage import GlossStorage
+from src.tui.flows.flow_add_goals_expression_ai import flow_add_goals_expression_ai
 from src.tui.flows.flow_add_goals_expression_manual import flow_add_goals_expression_manual
 from src.tui.flows.flow_set_settings import settings_flow
 from src.tui.flows.flow_set_situation import set_situation_flow
@@ -47,6 +48,7 @@ def main_menu(storage: GlossStorage):
         selection = choice(
             message=title,
             options=[
+                ("add_expr_ai", "Add expression goals (AI)"),
                 ("add_expr_manual", "Add expression goals (manual)"),
                 ("split_parts", "Split glosses into parts (AI)"),
                 ("set_situation", "Change situation / languages"),
@@ -55,7 +57,9 @@ def main_menu(storage: GlossStorage):
             ],
             default="quit",
         )
-        if selection == "add_expr_manual":
+        if selection == "add_expr_ai":
+            flow_add_goals_expression_ai(storage, state)
+        elif selection == "add_expr_manual":
             flow_add_goals_expression_manual(storage, state)
         elif selection == "split_parts":
             flow_split_glosses_of_situation_into_parts_ai(storage, state)
