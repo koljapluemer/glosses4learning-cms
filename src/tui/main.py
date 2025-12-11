@@ -25,6 +25,7 @@ from src.tui.flows.flow_set_situation import set_situation_flow
 from src.tui.flows.flow_split_glosses_of_situation_into_parts_ai import (
     flow_split_glosses_of_situation_into_parts_ai,
 )
+from src.tui.flows.flow_export_situations_batch import flow_export_situations_batch
 from src.tui.flows.flow_translate_untranslated_native_ai import flow_translate_untranslated_native_ai
 from src.tui.flows.flow_translate_untranslated_target_ai import flow_translate_untranslated_target_ai
 
@@ -65,6 +66,7 @@ def main_menu(storage: GlossStorage):
                 ("translate_native", "Translate target glosses to native (AI)"),
                 ("translate_target", "Translate native glosses to target (AI)"),
                 ("split_parts", "Split glosses into parts (AI)"),
+                ("batch_export", "Batch export situations"),
                 ("set_situation", "Change situation / languages"),
                 ("settings", "Settings (API key)"),
                 ("quit", "Quit"),
@@ -91,6 +93,8 @@ def main_menu(storage: GlossStorage):
             flow_translate_untranslated_target_ai(storage, state)
         elif selection == "split_parts":
             flow_split_glosses_of_situation_into_parts_ai(storage, state)
+        elif selection == "batch_export":
+            flow_export_situations_batch(storage, state)
         elif selection == "set_situation":
             new_state = set_situation_flow(storage, state)
             if new_state:
