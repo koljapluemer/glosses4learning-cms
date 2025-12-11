@@ -19,6 +19,6 @@ CLI/TUI tools (prompt_toolkit) and a tiny Flask view for managing gloss JSON fil
 4. State persists in `src/shared/state.json`; logs in `src/shared/log_files/app.log`.
 
 ## Tree viewer (Flask)
-- Run: `uv run flask --app src.flask.show_tree run --debug`
+- Run: `uv run flask --app src.flask.tree.show_tree run --debug`
 - Open: http://127.0.0.1:5000  
 - Read-only view of the current situation tree.

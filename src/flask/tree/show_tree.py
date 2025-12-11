@@ -5,8 +5,15 @@ from pathlib import Path
 
 from flask import Flask, render_template_string
 
+def find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+    return start
+
+
 HERE = Path(__file__).resolve()
-REPO_ROOT = HERE.parents[2]
+REPO_ROOT = find_repo_root(HERE)
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
