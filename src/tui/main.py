@@ -15,8 +15,6 @@ from src.shared.state import load_state, save_state
 from src.shared.storage import GlossStorage
 from src.tui.flows.flow_add_goals_expression_ai import flow_add_goals_expression_ai
 from src.tui.flows.flow_add_goals_expression_manual import flow_add_goals_expression_manual
-from src.tui.flows.flow_add_goals_procedural_paraphrase_ai import flow_add_goals_procedural_paraphrase_ai
-from src.tui.flows.flow_add_goals_procedural_paraphrase_manual import flow_add_goals_procedural_paraphrase_manual
 from src.tui.flows.flow_add_situations_ai import flow_add_situations_ai
 from src.tui.flows.flow_add_situations_manual import flow_add_situations_manual
 from src.tui.flows.flow_add_usage_examples_ai import flow_add_usage_examples_ai
@@ -61,8 +59,6 @@ def main_menu(storage: GlossStorage):
                 ("add_situation_manual", "Add situations (manual)"),
                 ("add_expr_ai", "Add expression goals (AI, native language)"),
                 ("add_expr_manual", "Add expression goals (manual, native language)"),
-                ("add_understand_ai", "Add understand goals (AI, target language)"),
-                ("add_understand_manual", "Add understand goals (manual, target language)"),
                 ("add_usage_ai", "Add usage examples (AI, target language)"),
                 ("translate_native", "Translate target glosses to native (AI)"),
                 ("translate_paraphrases_to_target", "Translate paraphrases: native → target (AI)"),
@@ -83,10 +79,6 @@ def main_menu(storage: GlossStorage):
             flow_add_goals_expression_ai(storage, state)
         elif selection == "add_expr_manual":
             flow_add_goals_expression_manual(storage, state)
-        elif selection == "add_understand_ai":
-            flow_add_goals_procedural_paraphrase_ai(storage, state)
-        elif selection == "add_understand_manual":
-            flow_add_goals_procedural_paraphrase_manual(storage, state)
         elif selection == "add_usage_ai":
             flow_add_usage_examples_ai(storage, state)
         elif selection == "translate_native":

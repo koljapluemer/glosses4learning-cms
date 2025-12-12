@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
+
+from agents.agent import Agent
+from agents.model_settings import ModelSettings
+from agents.run import Runner
 
 from agent.config import DATA_ROOT, DEFAULT_AGENT_MODEL, DEFAULT_MAX_ITERATIONS
 from agent.context import AgentContext
 from agent.logging_config import setup_agent_logging
-from src.shared.llm_client import get_openai_client
-from src.shared.state import load_state, save_state
+from agent.tools import get_all_tool_wrappers
+from src.shared.state import get_api_key, load_state, save_state
 from src.shared.storage import Gloss, GlossStorage
 
 
@@ -42,70 +47,36 @@ Be thorough but efficient - aim for high-quality, well-connected content.
 IMPORTANT: You can call multiple tools in sequence. After generating content (like goals or translations),
 review the results and call the appropriate database tools to add the desired items."""
 
+# When situations are empty, the agent should bootstrap coverage:
+# - Brainstorm ideas for the situation
+# - Generate procedural (things to say) and understanding (things to hear) goals
+# - Add them, then re-check coverage using the coverage judgment tools
 
-def create_tool_schemas_for_openai(tools: list) -> list[dict]:
+
+def create_tool_schemas_for_openai(tools: list | None = None) -> list[dict]:
     """
     Create OpenAI function schemas from tool functions.
 
-    This is a simplified version that extracts function metadata.
-    In a full implementation, this would parse the @function_tool decorators.
-
-    For now, we'll create a basic mapping manually for the implemented tools.
+    This uses the FunctionTool wrappers from the OpenAI Agents SDK, so the
+    parameter schemas stay in sync with the tool signatures.
     """
-    # Manual tool schemas for the implemented tools
-    # In production, these would be auto-generated from tool decorators
-    tool_schemas = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_situation_state",
-                "description": "Get comprehensive state information about the learning situation including goal validation states",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "situation_ref": {
-                            "type": "string",
-                            "description": "Situation reference (format: 'lang:slug'). If null, uses current situation from context."
-                        }
-                    },
-                    "required": []
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "generate_procedural_goals",
-                "description": "Generate procedural paraphrase expression goals for a situation",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "situation_ref": {"type": "string", "description": "Situation reference"},
-                        "num_goals": {"type": "integer", "description": "Number of goals to generate", "default": 5},
-                        "extra_context": {"type": "string", "description": "Optional extra context"}
-                    },
-                    "required": []
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "add_gloss_as_procedural_goal",
-                "description": "Add a gloss as a procedural paraphrase expression goal to the situation",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "content": {"type": "string", "description": "Procedural paraphrase expression in native language"},
-                        "situation_ref": {"type": "string", "description": "Situation reference"}
-                    },
-                    "required": ["content", "situation_ref"]
-                }
-            }
-        },
-    ]
+    if tools is None:
+        tools = get_all_tool_wrappers()
 
-    return tool_schemas
+    schemas: list[dict] = []
+    for tool in tools:
+        name = getattr(tool, "name", None) or str(tool)
+        desc = getattr(tool, "description", "") or ""
+        params = getattr(tool, "params_json_schema", {"type": "object", "properties": {}, "required": []})
+        schemas.append({
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": desc,
+                "parameters": params,
+            }
+        })
+    return schemas
 
 
 def run_agent_simple(
@@ -145,8 +116,18 @@ def run_agent_simple(
     logger.info(f"Agent started. Session: {session_id}")
     logger.info(f"Situation: {situation_ref}, Languages: {native_language} → {target_language}")
 
-    # Import tools
+    # Import tools (full registry available via get_all_tool_wrappers)
+    all_tool_wrappers = get_all_tool_wrappers()
+    logger.info(f"Loaded {len(all_tool_wrappers)} tools for agent use.")
     from agent.tools.queries.get_situation_state import get_situation_state
+    from agent.tools.llm.brainstorm_situation_ideas import brainstorm_situation_ideas
+    from agent.tools.llm.generate_procedural_goals import generate_procedural_goals
+    from agent.tools.llm.generate_understanding_goals import generate_understanding_goals
+    from agent.tools.llm.judge_expression_goals_coverage import judge_expression_goals_coverage
+    from agent.tools.llm.judge_understanding_goals_coverage import judge_understanding_goals_coverage
+    from agent.tools.database.add_gloss_procedural import add_gloss_as_procedural_goal
+    from agent.tools.database.add_gloss_understanding import add_gloss_as_understanding_goal
+    from src.shared.tree import detect_goal_type
 
     # Create a simple context wrapper for tools
     class SimpleContext:
@@ -171,33 +152,51 @@ def run_agent_simple(
     print(f"  Red: {state.get('red_goals')}")
     print(f"  Yellow: {state.get('yellow_goals')}")
     print(f"  Green: {state.get('green_goals')}")
+    # Build an Agents SDK agent and let it run with the full toolset
+    all_tool_wrappers = get_all_tool_wrappers()
+    logger.info(f"Loaded {len(all_tool_wrappers)} tools for agent use.")
 
-    # Provide next steps recommendations
+    def _instructions(context, _agent):
+        ctx = getattr(context, "context", {}) or {}
+        agent_context = ctx.get("agent_context")
+        return (
+            f"{SYSTEM_INSTRUCTIONS}\n\n"
+            f"Situation: {getattr(agent_context, 'situation_ref', situation_ref)}\n"
+            f"Native→Target: {getattr(agent_context, 'native_language', native_language)} → {getattr(agent_context, 'target_language', target_language)}\n"
+            "- If no goals exist, brainstorm the situation, generate procedural and understanding goals (5–8 each), add them, and re-check coverage. "
+            "Stop after two generation passes or when coverage judges are >=7/10.\n"
+            "- Skip duplicate/empty goals; ignore tool responses containing errors.\n"
+            "- Log each step (brainstorm, generate counts, judge scores) concisely.\n"
+        )
+
+    agent = Agent(
+        name="SituationFiller",
+        instructions=_instructions,
+        model=DEFAULT_AGENT_MODEL,
+        model_settings=ModelSettings(tool_choice="auto"),
+        tools=all_tool_wrappers,
+    )
+
+    # Use the initial state as input context for the agent
+    initial_prompt = (
+        "Current situation state (JSON):\n"
+        f"{state_json}\n\n"
+        "Improve coverage until goals are well covered. Act using the available tools."
+    )
+
+    result = Runner.run_sync(
+        agent,
+        initial_prompt,
+        context={"agent_context": agent_ctx},
+        max_turns=max_iterations,
+    )
+
+    final_output = getattr(result, "final_output", None)
     print(f"\n{'='*60}")
-    print("RECOMMENDED NEXT STEPS:")
+    print("FINAL OUTPUT")
     print(f"{'='*60}")
-
-    if state.get('total_goals') == 0:
-        print("\n1. Generate procedural goals using generate_procedural_goals tool")
-        print("2. Generate understanding goals using generate_understanding_goals tool")
-        print("3. Add generated goals using add_gloss_as_procedural_goal and add_gloss_as_understanding_goal")
-    elif state.get('red_goals', 0) > 0:
-        print(f"\n{state.get('red_goals')} RED goals need attention:")
-        print("1. Check list_missing_translations to see what needs translating")
-        print("2. Use translate_paraphrased_native or translate_native_glosses to generate translations")
-        print("3. Add translations using add_translation tool")
-        print("4. Check list_missing_parts for glosses that need splitting")
-    elif state.get('yellow_goals', 0) > 0:
-        print(f"\n{state.get('yellow_goals')} YELLOW goals can be improved:")
-        print("1. Add more translations for better coverage")
-        print("2. Add usage examples for target language glosses")
-        print("3. Add notes to translation siblings")
-    else:
-        print("\n✓ All goals are GREEN! Situation is well covered.")
-
-    print(f"\n{'='*60}")
-    print(f"Session logs: agent/logs/agent_session_{session_id}.log")
-    print(f"{'='*60}\n")
+    print(final_output or "(no final output)")
+    print(f"\nSession logs: agent/logs/agent_session_{session_id}.log\n")
 
     logger.info("Agent session completed")
 
@@ -205,7 +204,7 @@ def run_agent_simple(
         "success": True,
         "session_id": session_id,
         "initial_state": state,
-        "message": "Simple agent inspection complete. See logs and use tools manually for now.",
+        "message": final_output or "Agent run complete.",
     }
 
 
@@ -213,7 +212,6 @@ def run_agent_for_situation(
     situation_ref: str,
     native_language: str,
     target_language: str,
-    api_key: str | None = None,
     data_root: Path | None = None,
     max_iterations: int = DEFAULT_MAX_ITERATIONS,
 ) -> dict:
@@ -224,19 +222,15 @@ def run_agent_for_situation(
         situation_ref: Situation reference (e.g., "eng:cooking-together")
         native_language: Native language code (e.g., "eng")
         target_language: Target language code (e.g., "deu")
-        api_key: OpenAI API key (defaults to state)
         data_root: Data root path (defaults to project root)
         max_iterations: Maximum agent iterations
 
     Returns:
         Dict with run statistics
     """
-    # Load state for API key if not provided
-    if not api_key:
-        state = load_state()
-        api_key = state.get("settings", {}).get("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("API key required (not found in state)")
+    # Always load API key from local state file
+    api_key = get_api_key()
+    os.environ["OPENAI_API_KEY"] = api_key
 
     # Setup storage
     if not data_root:

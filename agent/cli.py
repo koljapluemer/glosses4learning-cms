@@ -20,9 +20,6 @@ Examples:
   # Run agent for a situation
   %(prog)s --situation "eng:cooking-together" --native eng --target deu
 
-  # With custom API key
-  %(prog)s --situation "eng:at-the-airport" --native eng --target arb --api-key YOUR_KEY
-
   # With custom data directory
   %(prog)s --situation "eng:shopping" --native eng --target spa --data-root /path/to/data
 
@@ -44,10 +41,6 @@ For more information, see the README.md
         "--target",
         required=True,
         help="Target language code (ISO 639-3, e.g., 'deu', 'arb', 'spa')",
-    )
-    parser.add_argument(
-        "--api-key",
-        help="OpenAI API key (defaults to value in src/shared/state.json)",
     )
     parser.add_argument(
         "--max-iterations",
@@ -83,7 +76,6 @@ For more information, see the README.md
             situation_ref=args.situation,
             native_language=args.native,
             target_language=args.target,
-            api_key=args.api_key,
             data_root=args.data_root,
             max_iterations=args.max_iterations,
         )
