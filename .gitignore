@@ -32,3 +32,6 @@ notebooks/.ipynb_checkpoints/
 .vscode/
 .idea/
 .DS_Store
+
+agent/logs/
+*.log
