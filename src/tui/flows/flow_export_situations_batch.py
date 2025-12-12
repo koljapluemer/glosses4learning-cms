@@ -40,8 +40,11 @@ def _gather_refs(root_node: dict[str, Any]) -> tuple[list[str], list[str]]:
     refs: list[str] = []
     learn_refs: list[str] = []
     seen: set[str] = set()
+    skip_parts = root_node.get("goal_type") == "procedural"
 
     def walk(node: dict[str, Any]):
+        if skip_parts and node.get("role") in ("part", "usage_part"):
+            return
         ref = _node_ref(node)
         if ref not in seen:
             seen.add(ref)
@@ -80,6 +83,10 @@ def _build_export_payload(
             all_refs.add(ref)
 
     for root in goal_nodes:
+        # Skip goals that are not at least yellow (only export yellow/green)
+        state = (root.get("state") or "").lower()
+        if state not in ("yellow", "green"):
+            continue
         goal_type = root.get("goal_type")
         if goal_type not in ("procedural", "understand"):
             continue

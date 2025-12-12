@@ -54,8 +54,18 @@
                     <input type="checkbox" />
                     <div class="collapse-title flex items-center gap-2">
                       {% if node.marker %}<span class="badge badge-outline">{{ node.marker }}</span>{% endif %}
+                      {% if node.state %}
+                        {% if node.state == 'red' %}
+                          {% set state_class = "badge-error" %}
+                        {% elif node.state == 'yellow' %}
+                          {% set state_class = "badge-warning" %}
+                        {% else %}
+                          {% set state_class = "badge-success" %}
+                        {% endif %}
+                        <span class="badge {{ state_class }} uppercase">{{ node.state }}</span>
+                      {% endif %}
                       <i data-lucide="{{ icon_for_role(node.role) }}" class="w-4 h-4"></i>
-                      <span class="{{ 'font-semibold' if node.bold else '' }}">{{ node.gloss.content }}</span>
+                      <span class="{{ 'font-semibold' if node.bold else '' }}">{{ node.display or node.gloss.content }}</span>
                       {% if node.warn_native_missing or node.warn_target_missing %}<i data-lucide="languages" class="w-4 h-4 text-warning" title="Translation missing"></i>{% endif %}
                       {% if node.warn_usage_missing %}<i data-lucide="message-square-warning" class="w-4 h-4 text-warning" title="Usage missing"></i>{% endif %}
                       {% if node.warn_parts_missing %}<i data-lucide="layers" class="w-4 h-4 text-warning" title="Parts missing"></i>{% endif %}
@@ -69,8 +79,18 @@
                 {% else %}
                   <div class="bg-base-100 shadow rounded-box px-3 py-2 flex items-center gap-2">
                     {% if node.marker %}<span class="badge badge-outline">{{ node.marker }}</span>{% endif %}
+                    {% if node.state %}
+                      {% if node.state == 'red' %}
+                        {% set state_class = "badge-error" %}
+                      {% elif node.state == 'yellow' %}
+                        {% set state_class = "badge-warning" %}
+                      {% else %}
+                        {% set state_class = "badge-success" %}
+                      {% endif %}
+                      <span class="badge {{ state_class }} uppercase">{{ node.state }}</span>
+                    {% endif %}
                     <i data-lucide="{{ icon_for_role(node.role) }}" class="w-4 h-4"></i>
-                    <span class="{{ 'font-semibold' if node.bold else '' }}">{{ node.gloss.content }}</span>
+                    <span class="{{ 'font-semibold' if node.bold else '' }}">{{ node.display or node.gloss.content }}</span>
                     {% if node.warn_native_missing or node.warn_target_missing %}<i data-lucide="languages" class="w-4 h-4 text-warning" title="Translation missing"></i>{% endif %}
                     {% if node.warn_usage_missing %}<i data-lucide="message-square-warning" class="w-4 h-4 text-warning" title="Usage missing"></i>{% endif %}
                     {% if node.warn_parts_missing %}<i data-lucide="layers" class="w-4 h-4 text-warning" title="Parts missing"></i>{% endif %}

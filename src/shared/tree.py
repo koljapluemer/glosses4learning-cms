@@ -55,6 +55,34 @@ def evaluate_goal_state(gloss: Gloss, storage: GlossStorage, native_language: st
                 items.append(p)
         return items
 
+    def _translations_to(gl: Gloss, lang: str, *, require_non_paraphrase: bool = False) -> list[Gloss]:
+        matches: list[Gloss] = []
+        for ref in getattr(gl, "translations", []) or []:
+            ref_lang = ref.split(":", 1)[0].strip().lower()
+            if ref_lang != lang:
+                continue
+            t_gloss = storage.resolve_reference(ref)
+            if not t_gloss:
+                continue
+            if require_non_paraphrase and "eng:paraphrase" in (t_gloss.tags or []):
+                continue
+            matches.append(t_gloss)
+        return matches
+
+    def _translations_to(gl: Gloss, lang: str, *, require_non_paraphrase: bool = False) -> list[Gloss]:
+        matches: list[Gloss] = []
+        for ref in getattr(gl, "translations", []) or []:
+            ref_lang = ref.split(":", 1)[0].strip().lower()
+            if ref_lang != lang:
+                continue
+            t_gloss = storage.resolve_reference(ref)
+            if not t_gloss:
+                continue
+            if require_non_paraphrase and "eng:paraphrase" in (t_gloss.tags or []):
+                continue
+            matches.append(t_gloss)
+        return matches
+
     goal_kind = detect_goal_type(gloss, native, target)
     goal_ref = f"{gloss.language}:{gloss.slug or gloss.content}"
     lines: list[str] = [
@@ -136,21 +164,32 @@ def evaluate_goal_state(gloss: Gloss, storage: GlossStorage, native_language: st
         _section("yellow_requirements")
         c_lang = _check("goal expression is in native language", goal_lang == native, missing=[goal_ref])
         c_tag = _check("goal tagged eng:paraphrase", "eng:paraphrase" in tags, missing=[goal_ref])
-        goal_target_trans = _translation_refs(gloss, target)
+        goal_target_trans_glosses = _translations_to(gloss, target)
         c_t1 = _check(
             "goal has >=1 translation into target",
-            len(goal_target_trans) >= 1,
+            len(goal_target_trans_glosses) >= 1,
             missing=[goal_ref],
         )
-        parts = _parts()
-        c_parts = _check("goal has parts", bool(parts), missing=[goal_ref])
+        # For procedural paraphrases: do not require parts on the goal itself.
+        # Require each translated target expression to have parts, and those parts to translate back to native.
+        missing_parts = []
         missing_parts_trans: list[str] = []
-        for part in parts:
-            part_trans = _translation_refs(part, target, require_non_paraphrase=True)
-            if len(part_trans) < 1:
-                missing_parts_trans.append(f"{part.language}:{part.slug or part.content}")
+        for t_gloss in goal_target_trans_glosses:
+            t_parts = getattr(t_gloss, "parts", []) or []
+            if not t_parts:
+                missing_parts.append(f"{t_gloss.language}:{t_gloss.slug or t_gloss.content}")
+                continue
+            for part_ref in t_parts:
+                part = storage.resolve_reference(part_ref)
+                if not part:
+                    missing_parts_trans.append(f"{part_ref} (missing gloss)")
+                    continue
+                back_trans = _translation_refs(part, native)
+                if len(back_trans) < 1:
+                    missing_parts_trans.append(f"{part.language}:{part.slug or part.content}")
+        c_parts = _check("each target translation has parts", not missing_parts, missing=missing_parts)
         c_parts_trans = _check(
-            "each part has >=1 translation to target (non-paraphrase)",
+            "each part of each target translation has >=1 translation to native",
             not missing_parts_trans,
             missing=missing_parts_trans,
         )
@@ -160,7 +199,7 @@ def evaluate_goal_state(gloss: Gloss, storage: GlossStorage, native_language: st
         if yellow_ok:
             c_t2 = _check(
                 "goal has >=2 translations into target",
-                len(goal_target_trans) >= 2,
+                len(goal_target_trans_glosses) >= 2,
                 missing=[goal_ref],
             )
             green_ok = c_t2
@@ -187,6 +226,8 @@ def paraphrase_display(gloss: Gloss) -> str:
     text = gloss.content or gloss.slug or ""
     if gloss.slug and gloss.slug not in text:
         text = f"{text} ({gloss.slug})"
+    if "eng:paraphrase" in (gloss.tags or []):
+        return f"[{text}]"
     return text
 
 
@@ -222,7 +263,12 @@ def build_goal_nodes(situation: Gloss, storage: GlossStorage, native_language: s
         stats["gloss_map"][key] = gl
         stats["situation_glosses"].add(key)
 
-        if not (getattr(gl, "parts", None) or []) and not has_log(gl, SPLIT_LOG_MARKER):
+        # Skip parts-missing warning for procedural paraphrase goals (we don't split them)
+        skip_parts_warning = False
+        if gl.language == native_language and "eng:procedural-paraphrase-expression-goal" in (gl.tags or []):
+            skip_parts_warning = True
+
+        if not skip_parts_warning and not (getattr(gl, "parts", None) or []) and not has_log(gl, SPLIT_LOG_MARKER):
             stats["parts_missing"].add(key)
 
         if gl.language == target_language:
@@ -256,6 +302,7 @@ def build_goal_nodes(situation: Gloss, storage: GlossStorage, native_language: s
 
         node = {
             "gloss": gloss,
+            "display": paraphrase_display(gloss),
             "children": [],
             "marker": marker,
             "bold": parts_line and gloss.language == learn_lang,
@@ -264,6 +311,9 @@ def build_goal_nodes(situation: Gloss, storage: GlossStorage, native_language: s
             "warn_target_missing": flags["warn_target_missing"],
             "warn_usage_missing": flags["warn_usage_missing"],
             "warn_parts_missing": key in stats["parts_missing"],
+            "state": determine_goal_state(gloss, storage, native_language, target_language)
+            if role == "root"
+            else "",
         }
 
         if key in path:
@@ -274,7 +324,13 @@ def build_goal_nodes(situation: Gloss, storage: GlossStorage, native_language: s
         if role in ("root", "part", "usage_part"):
             stats["glosses_to_learn"].add(key)
 
-        for part_ref in getattr(gloss, "parts", []):
+        is_procedural_root = (
+            role == "root"
+            and gloss.language == native_language
+            and "eng:procedural-paraphrase-expression-goal" in (gloss.tags or [])
+        )
+
+        for part_ref in ([] if is_procedural_root else getattr(gloss, "parts", [])):
             part_gloss = storage.resolve_reference(part_ref)
             if not part_gloss:
                 continue

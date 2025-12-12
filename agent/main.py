@@ -288,8 +288,12 @@ def run_agent_for_situation(
         canonical_ref = f"eng:{slug}"
         existing = storage.resolve_reference(canonical_ref)
         if existing:
+            tags = existing.tags or []
+            if "eng:situation" not in tags:
+                existing.tags = tags + ["eng:situation"]
+                storage.save_gloss(existing)
             return canonical_ref
-        situation_gloss = Gloss(content=slug, language="eng")
+        situation_gloss = Gloss(content=slug, language="eng", tags=["eng:situation"])
         storage.create_gloss(situation_gloss)
         return canonical_ref
 
