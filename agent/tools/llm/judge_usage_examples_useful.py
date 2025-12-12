@@ -87,7 +87,9 @@ def judge_usage_examples_useful(
                         "name": "usage_example_judgments",
                         "schema": {
                             "type": "object",
+                            "properties": {},
                             "additionalProperties": {"type": "boolean"},
+                            "required": [],
                         },
                         "strict": False,
                     },

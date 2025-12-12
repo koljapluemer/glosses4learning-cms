@@ -9,9 +9,7 @@ from agent.tools.database.add_gloss_understanding import add_gloss_as_understand
 from agent.tools.database.add_note import add_note, add_note_tool
 from agent.tools.database.add_parts import add_parts, add_parts_tool
 from agent.tools.database.add_translation import add_translation, add_translation_tool
-from agent.tools.database.add_usage_examples import add_usage_examples, add_usage_examples_tool
 from agent.tools.database.attach_to_situation import attach_to_situation, attach_to_situation_tool
-from agent.tools.database.mark_no_usage_examples import mark_no_usage_examples, mark_no_usage_examples_tool
 from agent.tools.database.mark_unsplittable import mark_unsplittable, mark_unsplittable_tool
 from agent.tools.database.mark_untranslatable import mark_untranslatable, mark_untranslatable_tool
 
@@ -20,7 +18,6 @@ from agent.tools.queries.find_translation_siblings import find_translation_sibli
 from agent.tools.queries.get_situation_state import get_situation_state, get_situation_state_tool
 from agent.tools.queries.list_missing_parts import list_missing_parts, list_missing_parts_tool
 from agent.tools.queries.list_missing_translations import list_missing_translations, list_missing_translations_tool
-from agent.tools.queries.list_missing_usage import list_missing_usage, list_missing_usage_tool
 from agent.tools.queries.list_procedural_goals import list_procedural_goals, list_procedural_goals_tool
 from agent.tools.queries.list_understanding_goals import list_understanding_goals, list_understanding_goals_tool
 
@@ -28,14 +25,13 @@ from agent.tools.queries.list_understanding_goals import list_understanding_goal
 from agent.tools.llm.brainstorm_situation_ideas import brainstorm_situation_ideas, brainstorm_situation_ideas_tool
 from agent.tools.llm.generate_procedural_goals import generate_procedural_goals, generate_procedural_goals_tool
 from agent.tools.llm.generate_understanding_goals import generate_understanding_goals, generate_understanding_goals_tool
-from agent.tools.llm.generate_usage_examples import generate_usage_examples, generate_usage_examples_tool
 from agent.tools.llm.generate_usage_notes import generate_usage_notes, generate_usage_notes_tool
 from agent.tools.llm.judge_expression_goals_coverage import judge_expression_goals_coverage, judge_expression_goals_coverage_tool
 from agent.tools.llm.judge_glosses_splittable import judge_glosses_splittable, judge_glosses_splittable_tool
 from agent.tools.llm.judge_understanding_goals_coverage import judge_understanding_goals_coverage, judge_understanding_goals_coverage_tool
-from agent.tools.llm.judge_usage_examples_useful import judge_usage_examples_useful, judge_usage_examples_useful_tool
 from agent.tools.maintenance.fix_missing_parts import fix_missing_parts
 from agent.tools.maintenance.fix_missing_translations import fix_missing_translations
+from agent.tools.maintenance.fix_usage_examples import fix_usage_examples
 
 
 def get_all_tools() -> list:
@@ -55,11 +51,9 @@ def get_all_tools() -> list:
         add_gloss_as_understanding_goal,
         add_translation,
         add_parts,
-        add_usage_examples,
         add_note,
         mark_unsplittable,
         mark_untranslatable,
-        mark_no_usage_examples,
         attach_to_situation,
         # Query tools (7)
         get_situation_state,
@@ -67,13 +61,10 @@ def get_all_tools() -> list:
         list_understanding_goals,
         list_missing_translations,
         list_missing_parts,
-        list_missing_usage,
         find_translation_siblings,
         # LLM tools (13 - ALL IMPLEMENTED)
         generate_procedural_goals,
         generate_understanding_goals,
-        judge_usage_examples_useful,
-        generate_usage_examples,
         generate_usage_notes,
         judge_expression_goals_coverage,
         judge_understanding_goals_coverage,
@@ -81,6 +72,7 @@ def get_all_tools() -> list:
         # Batch maintenance tools
         fix_missing_parts,
         fix_missing_translations,
+        fix_usage_examples,
     ]
 
 
@@ -96,11 +88,9 @@ def get_all_tool_wrappers() -> list:
         add_gloss_as_understanding_goal_tool,
         add_translation_tool,
         add_parts_tool,
-        add_usage_examples_tool,
         add_note_tool,
         mark_unsplittable_tool,
         mark_untranslatable_tool,
-        mark_no_usage_examples_tool,
         attach_to_situation_tool,
         # Query wrappers
         get_situation_state_tool,
@@ -108,13 +98,10 @@ def get_all_tool_wrappers() -> list:
         list_understanding_goals_tool,
         list_missing_translations_tool,
         list_missing_parts_tool,
-        list_missing_usage_tool,
         find_translation_siblings_tool,
         # LLM wrappers
         generate_procedural_goals_tool,
         generate_understanding_goals_tool,
-        judge_usage_examples_useful_tool,
-        generate_usage_examples_tool,
         generate_usage_notes_tool,
         judge_expression_goals_coverage_tool,
         judge_understanding_goals_coverage_tool,
@@ -122,6 +109,7 @@ def get_all_tool_wrappers() -> list:
         # Batch maintenance wrappers
         fix_missing_parts,
         fix_missing_translations,
+        fix_usage_examples,
     ]
 
 
@@ -133,11 +121,9 @@ __all__ = [
     "add_gloss_as_understanding_goal",
     "add_translation",
     "add_parts",
-    "add_usage_examples",
     "add_note",
     "mark_unsplittable",
     "mark_untranslatable",
-    "mark_no_usage_examples",
     "attach_to_situation",
     # Query tools
     "get_situation_state",
@@ -145,13 +131,10 @@ __all__ = [
     "list_understanding_goals",
     "list_missing_translations",
     "list_missing_parts",
-    "list_missing_usage",
     "find_translation_siblings",
     # LLM tools
     "generate_procedural_goals",
     "generate_understanding_goals",
-    "judge_usage_examples_useful",
-    "generate_usage_examples",
     "generate_usage_notes",
     "judge_expression_goals_coverage",
     "judge_understanding_goals_coverage",
@@ -159,5 +142,6 @@ __all__ = [
     # Batch tools
     "fix_missing_parts",
     "fix_missing_translations",
+    "fix_usage_examples",
     "get_all_tool_wrappers",
 ]
