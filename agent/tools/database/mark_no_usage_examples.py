@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.gloss_operations import mark_gloss_log
 
-@function_tool
 def mark_no_usage_examples(
     ctx: RunContextWrapper,
     gloss_ref: Annotated[str, "Reference to gloss (format: 'lang:slug')"],
@@ -54,3 +54,5 @@ def mark_no_usage_examples(
             error_msg = f"Failed to mark no usage examples: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+mark_no_usage_examples_tool = function_tool(mark_no_usage_examples)

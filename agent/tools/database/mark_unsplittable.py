@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.gloss_operations import mark_gloss_log
 from src.shared.tree import SPLIT_LOG_MARKER
 
-@function_tool
 def mark_unsplittable(
     ctx: RunContextWrapper,
     gloss_ref: Annotated[str, "Reference to gloss (format: 'lang:slug')"],
@@ -50,3 +50,5 @@ def mark_unsplittable(
             error_msg = f"Failed to mark unsplittable: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+mark_unsplittable_tool = function_tool(mark_unsplittable)

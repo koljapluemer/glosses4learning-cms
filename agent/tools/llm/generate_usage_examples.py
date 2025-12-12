@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.languages import get_ai_note
@@ -28,7 +29,6 @@ The gloss should appear naturally in each sentence. Keep sentences practical and
 Return JSON with an "examples" array of sentence strings."""
 
 
-@function_tool
 def generate_usage_examples(
     ctx: RunContextWrapper,
     gloss_ref: Annotated[str, "Gloss reference for word/phrase to demonstrate (format: 'lang:slug')"],
@@ -124,3 +124,5 @@ def generate_usage_examples(
             error_msg = f"Failed to generate usage examples: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+generate_usage_examples_tool = function_tool(generate_usage_examples)

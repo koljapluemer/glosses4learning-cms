@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.gloss_operations import attach_translation_with_note
 
-@function_tool
 def add_translation(
     ctx: RunContextWrapper,
     source_gloss_ref: Annotated[str, "Source gloss reference (format: 'lang:slug')"],
@@ -85,3 +85,5 @@ def add_translation(
             error_msg = f"Failed to add translation: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+add_translation_tool = function_tool(add_translation)

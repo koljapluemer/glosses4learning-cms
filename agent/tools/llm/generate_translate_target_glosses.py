@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.languages import get_ai_note
@@ -28,7 +29,6 @@ Return a JSON object with a 'translations' array of translation strings. Keep th
 {ai_note}"""
 
 
-@function_tool
 def generate_translate_target_glosses(
     ctx: RunContextWrapper,
     gloss_refs: Annotated[list[str], "List of target language gloss references to translate (format: ['lang:slug', ...])"],
@@ -127,3 +127,5 @@ def generate_translate_target_glosses(
             error_msg = f"Failed to translate target glosses: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+generate_translate_target_glosses_tool = function_tool(generate_translate_target_glosses)

@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.storage import Gloss, attach_relation
 
-@function_tool
 def add_gloss_as_understanding_goal(
     ctx: RunContextWrapper,
     content: Annotated[str, "Expression in target language to understand"],
@@ -85,3 +85,5 @@ def add_gloss_as_understanding_goal(
             error_msg = f"Failed to add understanding goal: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+add_gloss_as_understanding_goal_tool = function_tool(add_gloss_as_understanding_goal)

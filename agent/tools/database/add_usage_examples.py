@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.storage import attach_relation
 
-@function_tool
 def add_usage_examples(
     ctx: RunContextWrapper,
     gloss_ref: Annotated[str, "Reference to gloss to add examples to (format: 'lang:slug')"],
@@ -77,3 +77,5 @@ def add_usage_examples(
             error_msg = f"Failed to add usage examples: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+add_usage_examples_tool = function_tool(add_usage_examples)

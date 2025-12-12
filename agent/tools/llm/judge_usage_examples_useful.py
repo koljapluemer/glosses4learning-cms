@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.llm_client import get_openai_client
@@ -27,7 +28,6 @@ Glosses to judge:
 Return JSON with a "judgments" object mapping each gloss content to a boolean."""
 
 
-@function_tool
 def judge_usage_examples_useful(
     ctx: RunContextWrapper,
     gloss_refs: Annotated[list[str], "List of gloss references to judge (format: ['lang:slug', ...])"],
@@ -117,3 +117,5 @@ def judge_usage_examples_useful(
             error_msg = f"Failed to judge usage example suitability: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+judge_usage_examples_useful_tool = function_tool(judge_usage_examples_useful)

@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.config import TEMPERATURE_CREATIVE
 from agent.logging_config import LogContext
@@ -53,7 +54,6 @@ RESPONSE_SCHEMA = {
 }
 
 
-@function_tool
 def generate_understanding_goals(
     ctx: RunContextWrapper,
     situation_ref: Annotated[str | None, "Situation reference. If None, uses current situation."] = None,
@@ -143,3 +143,5 @@ def generate_understanding_goals(
             error_msg = f"LLM call failed: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return json.dumps({"error": error_msg})
+
+generate_understanding_goals_tool = function_tool(generate_understanding_goals)

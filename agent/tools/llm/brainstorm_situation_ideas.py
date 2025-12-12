@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.languages import get_ai_note
@@ -33,7 +34,6 @@ Brainstorm ideas about:
 Provide your brainstorming as free-form text with practical, realistic ideas."""
 
 
-@function_tool
 def brainstorm_situation_ideas(
     ctx: RunContextWrapper,
     situation_ref: Annotated[str, "Situation reference (format: 'lang:slug')"],
@@ -112,3 +112,5 @@ def brainstorm_situation_ideas(
             error_msg = f"Failed to brainstorm situation ideas: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+brainstorm_situation_ideas_tool = function_tool(brainstorm_situation_ideas)

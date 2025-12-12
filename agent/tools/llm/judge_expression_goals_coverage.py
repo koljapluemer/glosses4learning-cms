@@ -6,7 +6,8 @@ import json
 import random
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.llm_client import get_openai_client
@@ -32,7 +33,6 @@ First provide a judgment sentence explaining your assessment, then a rating from
 Return JSON with "judgment" (string) and "rating" (integer 1-10)."""
 
 
-@function_tool
 def judge_expression_goals_coverage(
     ctx: RunContextWrapper,
     situation_ref: Annotated[str, "Situation reference (format: 'lang:slug')"],
@@ -123,3 +123,5 @@ def judge_expression_goals_coverage(
             error_msg = f"Failed to judge expression goals coverage: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+judge_expression_goals_coverage_tool = function_tool(judge_expression_goals_coverage)

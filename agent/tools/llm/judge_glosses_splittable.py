@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.llm_client import get_openai_client
@@ -27,7 +28,6 @@ Glosses to judge:
 Return JSON with a "judgments" object mapping each gloss content to a boolean."""
 
 
-@function_tool
 def judge_glosses_splittable(
     ctx: RunContextWrapper,
     gloss_refs: Annotated[list[str], "List of gloss references to judge (format: ['lang:slug', ...])"],
@@ -117,3 +117,5 @@ def judge_glosses_splittable(
             error_msg = f"Failed to judge gloss splittability: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+judge_glosses_splittable_tool = function_tool(judge_glosses_splittable)

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.storage import Gloss
 
 
-@function_tool
 def add_gloss(
     ctx: RunContextWrapper,
     content: Annotated[str, "The gloss content/text to add"],
@@ -88,3 +88,5 @@ def add_gloss(
             error_msg = f"Failed to add gloss '{content}': {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+add_gloss_tool = function_tool(add_gloss)

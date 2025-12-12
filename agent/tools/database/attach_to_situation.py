@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.storage import attach_relation
 
-@function_tool
 def attach_to_situation(
     ctx: RunContextWrapper,
     gloss_ref: Annotated[str, "Reference to gloss to attach (format: 'lang:slug')"],
@@ -60,3 +60,5 @@ def attach_to_situation(
             error_msg = f"Failed to attach to situation: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+attach_to_situation_tool = function_tool(attach_to_situation)

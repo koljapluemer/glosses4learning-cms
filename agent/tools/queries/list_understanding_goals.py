@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.validation import get_goals_by_type
 
-@function_tool
 def list_understanding_goals(
     ctx: RunContextWrapper,
     situation_ref: Annotated[str | None, "Situation reference. If None, uses current situation."] = None,
@@ -77,3 +77,5 @@ def list_understanding_goals(
             error_msg = f"Failed to list understanding goals: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return json.dumps({"error": error_msg})
+
+list_understanding_goals_tool = function_tool(list_understanding_goals)

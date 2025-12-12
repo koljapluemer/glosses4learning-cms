@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.config import TEMPERATURE_TRANSLATION
 from agent.logging_config import LogContext
@@ -55,7 +56,6 @@ RESPONSE_SCHEMA = {
 }
 
 
-@function_tool
 def translate_native_glosses(
     ctx: RunContextWrapper,
     gloss_refs: Annotated[list[str], "List of native gloss references to translate"],
@@ -147,3 +147,5 @@ def translate_native_glosses(
             error_msg = f"LLM call failed: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return json.dumps({"error": error_msg})
+
+translate_native_glosses_tool = function_tool(translate_native_glosses)

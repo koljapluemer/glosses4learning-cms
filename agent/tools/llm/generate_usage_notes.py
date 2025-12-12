@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.languages import get_ai_note
@@ -31,7 +32,6 @@ Glosses:
 Return JSON with a "notes" object mapping each gloss content to its usage note string."""
 
 
-@function_tool
 def generate_usage_notes(
     ctx: RunContextWrapper,
     gloss_refs: Annotated[list[str], "List of target language gloss references (format: ['lang:slug', ...])"],
@@ -134,3 +134,5 @@ def generate_usage_notes(
             error_msg = f"Failed to generate usage notes: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return f"Error: {error_msg}"
+
+generate_usage_notes_tool = function_tool(generate_usage_notes)

@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.tree import collect_situation_stats
 
-@function_tool
 def find_translation_siblings(
     ctx: RunContextWrapper,
     situation_ref: Annotated[str | None, "Situation reference. If None, uses current situation."] = None,
@@ -110,3 +110,5 @@ def find_translation_siblings(
             error_msg = f"Failed to find translation siblings: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return json.dumps({"error": error_msg})
+
+find_translation_siblings_tool = function_tool(find_translation_siblings)

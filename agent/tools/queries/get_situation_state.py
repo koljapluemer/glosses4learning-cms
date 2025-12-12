@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from agents import RunContextWrapper, function_tool
+from agents.run_context import RunContextWrapper
+from agents.tool import function_tool
 
 from agent.logging_config import LogContext
 from src.shared.tree import build_goal_nodes, collect_situation_stats, detect_goal_type, evaluate_goal_state
 from src.shared.validation import assess_goals_state
 
-@function_tool
 def get_situation_state(
     ctx: RunContextWrapper,
     situation_ref: Annotated[str | None, "Situation reference (format: 'lang:slug'). If None, uses current situation from context."] = None,
@@ -139,3 +139,5 @@ def get_situation_state(
             error_msg = f"Failed to get situation state: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return json.dumps({"error": error_msg})
+
+get_situation_state_tool = function_tool(get_situation_state)
