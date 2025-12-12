@@ -11,7 +11,7 @@ from agent.context import AgentContext
 from agent.logging_config import setup_agent_logging
 from src.shared.llm_client import get_openai_client
 from src.shared.state import load_state, save_state
-from src.shared.storage import GlossStorage
+from src.shared.storage import Gloss, GlossStorage
 
 
 # System instructions for the agent
@@ -244,9 +244,28 @@ def run_agent_for_situation(
 
     storage = GlossStorage(data_root=data_root)
 
+    def _ensure_situation_exists(ref: str) -> str:
+        """
+        Situations are always stored under language 'eng' regardless of native/target.
+        Normalize the reference and create a bare situation gloss if missing.
+        """
+        slug = ref.split(":", 1)[1] if ":" in ref else ref
+        slug = slug.strip()
+        if not slug:
+            raise ValueError("Situation reference must include a slug")
+        canonical_ref = f"eng:{slug}"
+        existing = storage.resolve_reference(canonical_ref)
+        if existing:
+            return canonical_ref
+        situation_gloss = Gloss(content=slug, language="eng")
+        storage.create_gloss(situation_gloss)
+        return canonical_ref
+
+    canonical_situation_ref = _ensure_situation_exists(situation_ref)
+
     # Update state
     state = load_state()
-    state["situation_ref"] = situation_ref
+    state["situation_ref"] = canonical_situation_ref
     state["native_language"] = native_language
     state["target_language"] = target_language
     save_state(state)
@@ -255,7 +274,7 @@ def run_agent_for_situation(
     return run_agent_simple(
         storage=storage,
         api_key=api_key,
-        situation_ref=situation_ref,
+        situation_ref=canonical_situation_ref,
         native_language=native_language,
         target_language=target_language,
         max_iterations=max_iterations,
