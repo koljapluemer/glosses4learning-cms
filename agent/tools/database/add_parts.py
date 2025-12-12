@@ -55,22 +55,26 @@ def add_parts(
 
             for part_ref in part_refs:
                 try:
-                    # Ensure part gloss exists; create if missing using slug/content
+                    # Ensure part gloss exists; create if missing using slug/content.
                     part_gloss = storage.resolve_reference(part_ref)
                     if not part_gloss:
-                        if ":" not in part_ref:
-                            errors.append(f"Invalid part reference: {part_ref}")
-                            continue
-                        lang, slug = part_ref.split(":", 1)
-                        lang = lang.strip().lower()
-                        slug = derive_slug(slug.strip())
+                        if ":" in part_ref:
+                            lang, slug = part_ref.split(":", 1)
+                            lang = lang.strip().lower()
+                            slug = derive_slug(slug.strip())
+                            content = part_ref.split(":", 1)[1].strip()
+                        else:
+                            # No ref given; inherit parent language and use content as provided.
+                            lang = gloss.language
+                            content = part_ref.strip()
+                            slug = derive_slug(content)
+
                         if not lang or not slug:
                             errors.append(f"Invalid part reference: {part_ref}")
                             continue
-                        # Use slug as content placeholder; caller should refine later if needed.
-                        part_gloss = Gloss(content=slug, language=lang)
-                        part_gloss = storage.create_gloss(part_gloss)
-                        logger.info(f"Created missing part gloss: {part_ref}")
+
+                        part_gloss = storage.ensure_gloss(lang, content)
+                        logger.info(f"Ensured part gloss: {lang}:{part_gloss.slug}")
 
                     # Verify same language (within-language relationship)
                     if part_gloss.language != gloss.language:

@@ -87,23 +87,19 @@ def judge_usage_examples_useful(
                         "name": "usage_example_judgments",
                         "schema": {
                             "type": "object",
-                            "properties": {
-                                "judgments": {
-                                    "type": "object",
-                                    "additionalProperties": {"type": "boolean"},
-                                }
-                            },
-                            "required": ["judgments"],
-                            "additionalProperties": False,
+                            "additionalProperties": {"type": "boolean"},
                         },
-                        "strict": True,
+                        "strict": False,
                     },
                 },
             )
 
             content = response.choices[0].message.content.strip()
-            data = json.loads(content)
-            judgments_by_content = data.get("judgments", {})
+            try:
+                data = json.loads(content) if content else {}
+            except json.JSONDecodeError:
+                data = {}
+            judgments_by_content = data if isinstance(data, dict) else {}
 
             # Map back to gloss refs
             result = {}

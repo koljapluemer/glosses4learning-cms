@@ -97,7 +97,11 @@ def judge_glosses_splittable(
             )
 
             content = response.choices[0].message.content.strip()
-            data = json.loads(content) if content else {}
+            try:
+                data = json.loads(content) if content else {}
+            except json.JSONDecodeError as exc:
+                logger.error("Failed to parse splittability JSON: %s", exc)
+                data = {}
             judgments_by_content = data if isinstance(data, dict) else {}
 
             # Map back to gloss refs

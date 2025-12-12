@@ -72,6 +72,7 @@ RESPONSE_SCHEMA = {
 def translate_paraphrased_native(
     ctx: RunContextWrapper,
     gloss_refs: Annotated[list[str], "List of native paraphrase gloss references to translate"],
+    batch_size: Annotated[int, "Batch size for LLM calls"] = 25,
 ) -> str:
     """
     Translate paraphrased native expressions to target language.
@@ -108,7 +109,7 @@ def translate_paraphrased_native(
     target_language = agent_ctx.target_language
 
     with LogContext(logger, tool="translate_paraphrased_native"):
-        logger.info(f"Translating {len(gloss_refs)} paraphrased expressions")
+        logger.info(f"Translating {len(gloss_refs)} paraphrased expressions (batch size {batch_size})")
 
         try:
             # Get language-specific AI notes
@@ -118,21 +119,32 @@ def translate_paraphrased_native(
             client = get_openai_client(agent_ctx.api_key)
             results = {}
 
-            for ref in gloss_refs:
-                gloss = storage.resolve_reference(ref)
-                if not gloss:
-                    results[ref] = {"error": "Gloss not found"}
+            def chunk(seq, size):
+                for i in range(0, len(seq), size):
+                    yield seq[i : i + size]
+
+            for batch in chunk(gloss_refs, batch_size):
+                glosses = []
+                ref_map = {}
+                for ref in batch:
+                    gloss = storage.resolve_reference(ref)
+                    if not gloss:
+                        results[ref] = {"error": "Gloss not found"}
+                        continue
+                    glosses.append(gloss)
+                    ref_map[gloss.content] = ref
+
+                if not glosses:
                     continue
 
-                # Build prompt
-                prompt = USER_PROMPT_TEMPLATE.format(
-                    content=gloss.content,
-                    target_language=target_language,
-                    native_language=native_language,
-                    ai_note_text=ai_note_text,
+                prompt_items = "\n".join(f"- {g.content}" for g in glosses)
+                prompt = (
+                    f"Translate these communicative goals (paraphrases in {native_language}) into ACTUAL expressions in {target_language}.\n"
+                    f"{prompt_items}\n\n"
+                    "Return JSON with 'translations': { paraphrase_content: [ {\"text\": str, \"note\": str}, ... ] }.\n"
+                    "Always include 'note' (empty string if none)."
                 )
 
-                # Call LLM
                 response = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=[
@@ -140,30 +152,61 @@ def translate_paraphrased_native(
                         {"role": "user", "content": prompt},
                     ],
                     temperature=TEMPERATURE,
-                    max_tokens=300,
-                    response_format=RESPONSE_SCHEMA,
+                    max_tokens=1200,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "batched_paraphrase_translations",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "translations": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "text": {"type": "string"},
+                                                    "note": {"type": "string"},
+                                                },
+                                                "required": ["text", "note"],
+                                                "additionalProperties": False,
+                                            },
+                                        },
+                                    }
+                                },
+                                "required": ["translations"],
+                                "additionalProperties": False,
+                            },
+                            "strict": True,
+                        },
+                    },
                 )
 
                 content_str = response.choices[0].message.content.strip()
                 parsed = json.loads(content_str) if content_str else {}
-                translations = parsed.get("translations", []) if isinstance(parsed, dict) else []
+                translations_obj = parsed.get("translations", {}) if isinstance(parsed, dict) else {}
 
-                # Validate and clean
-                valid_translations = []
-                for item in translations:
-                    if (
-                        isinstance(item, dict)
-                        and isinstance(item.get("text"), str)
-                        and item["text"].strip() != ""
-                        and isinstance(item.get("note"), str)
-                    ):
-                        valid_translations.append({
-                            "text": item["text"].strip(),
-                            "note": item.get("note", "").strip(),
-                        })
+                for paraphrase_content, items in translations_obj.items():
+                    ref = ref_map.get(paraphrase_content)
+                    if not ref:
+                        continue
+                    valid_translations = []
+                    for item in items or []:
+                        if (
+                            isinstance(item, dict)
+                            and isinstance(item.get("text"), str)
+                            and item["text"].strip() != ""
+                            and isinstance(item.get("note"), str)
+                        ):
+                            valid_translations.append({
+                                "text": item["text"].strip(),
+                                "note": item.get("note", "").strip(),
+                            })
 
-                results[ref] = valid_translations
-                logger.info(f"Translated {ref}: {len(valid_translations)} expressions")
+                    results[ref] = valid_translations
+                    logger.info(f"Translated {ref}: {len(valid_translations)} expressions")
 
             return json.dumps({
                 "translations": results,

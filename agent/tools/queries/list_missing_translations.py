@@ -62,14 +62,16 @@ def list_missing_translations(
             target_missing = []
             paraphrased_native_missing = []
 
-            for ref in stats.get("native_missing", []):
+            # Native-language glosses missing target translations live in stats["target_missing"]
+            for ref in stats.get("target_missing", []):
                 gloss = storage.resolve_reference(ref)
                 if gloss and "eng:paraphrase" in (gloss.tags or []):
                     paraphrased_native_missing.append(ref)
                 else:
                     native_missing.append(ref)
 
-            target_missing = list(stats.get("target_missing", []))
+            # Target-language glosses missing native translations live in stats["native_missing"]
+            target_missing = list(stats.get("native_missing", []))
 
             # Build result based on category
             if category == "native":

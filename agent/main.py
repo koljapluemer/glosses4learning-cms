@@ -41,6 +41,8 @@ Guidelines:
 - Generate multiple options and select quality content
 - Add translations, parts, and usage examples as needed
 - Use judgment tools to avoid unnecessary work
+- When translating/splitting/generating usage, batch work: prefer passing lists of gloss refs to list-accepting tools (e.g., translate_native_glosses, generate_translate_target_glosses, generate_split_gloss_parts, generate_usage_examples) instead of one-by-one.
+- Use missing-list query tools to assemble batches (e.g., list_missing_translations, list_missing_parts, list_missing_usage) and process up to a reasonable batch size (5-20) per call.
 - Provide clear reasoning for your decisions
 - Always recheck state after major changes
 

@@ -32,6 +32,7 @@ Return a JSON object with a 'translations' array of translation strings. Keep th
 def generate_translate_target_glosses(
     ctx: RunContextWrapper,
     gloss_refs: Annotated[list[str], "List of target language gloss references to translate (format: ['lang:slug', ...])"],
+    batch_size: Annotated[int, "Batch size for LLM calls"] = 25,
 ) -> str:
     """
     Translate target language glosses to native language.
@@ -56,7 +57,7 @@ def generate_translate_target_glosses(
     native_language = agent_ctx.native_language
 
     with LogContext(logger, tool="generate_translate_target_glosses"):
-        logger.info(f"Translating {len(gloss_refs)} target glosses to {native_language}")
+        logger.info(f"Translating {len(gloss_refs)} target glosses to {native_language} (batch size {batch_size})")
 
         try:
             # Get language AI note for native language
@@ -66,22 +67,32 @@ def generate_translate_target_glosses(
             result = {}
             client = get_openai_client(api_key)
 
-            for ref in gloss_refs:
-                gloss = storage.resolve_reference(ref)
-                if not gloss:
-                    logger.warning(f"Gloss not found: {ref}")
-                    result[ref] = []
+            def chunk(seq, size):
+                for i in range(0, len(seq), size):
+                    yield seq[i : i + size]
+
+            for batch in chunk(gloss_refs, batch_size):
+                glosses = []
+                ref_map = {}
+                for ref in batch:
+                    gloss = storage.resolve_reference(ref)
+                    if not gloss:
+                        logger.warning(f"Gloss not found: {ref}")
+                        result[ref] = []
+                        continue
+                    glosses.append(gloss)
+                    ref_map[gloss.content] = ref
+
+                if not glosses:
                     continue
 
-                # Build prompt
-                prompt = USER_PROMPT_TEMPLATE.format(
-                    source_language=gloss.language,
-                    target_language=native_language,
-                    content=gloss.content,
-                    ai_note=ai_note_text,
+                prompt_items = "\n".join(f"- {g.content}" for g in glosses)
+                prompt = (
+                    f"Translate these {glosses[0].language} glosses into {native_language}.\n"
+                    f"{prompt_items}\n\n"
+                    "Return JSON with 'translations': { gloss_content: [str, ...] }."
                 )
 
-                # Call LLM
                 response = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=[
@@ -89,21 +100,19 @@ def generate_translate_target_glosses(
                         {"role": "user", "content": prompt},
                     ],
                     temperature=TEMPERATURE,
-                    max_tokens=200,
+                    max_tokens=1200,
                     response_format={
                         "type": "json_schema",
                         "json_schema": {
-                            "name": "translation_list",
+                            "name": "batched_translation_list",
                             "schema": {
                                 "type": "object",
-                                "properties": {
-                                    "translations": {
-                                        "type": "array",
-                                        "items": {"type": "string"},
-                                    }
+                                "properties": {},
+                                "required": [],
+                                "additionalProperties": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
                                 },
-                                "required": ["translations"],
-                                "additionalProperties": False,
                             },
                             "strict": True,
                         },
@@ -112,13 +121,15 @@ def generate_translate_target_glosses(
 
                 content = response.choices[0].message.content.strip()
                 data = json.loads(content)
-                translations = data.get("translations", [])
+                translations_obj = data if isinstance(data, dict) else {}
 
-                # Clean translations
-                translations = [t.strip() for t in translations if isinstance(t, str) and t.strip()]
-                result[ref] = translations
-
-                logger.info(f"Translated {ref}: {len(translations)} translations")
+                for gloss_content, items in translations_obj.items():
+                    ref = ref_map.get(gloss_content)
+                    if not ref:
+                        continue
+                    translations = [t.strip() for t in (items or []) if isinstance(t, str) and t.strip()]
+                    result[ref] = translations
+                    logger.info(f"Translated {ref}: {len(translations)} translations")
 
             logger.info(f"Completed translation of {len(result)} glosses")
             return json.dumps(result)

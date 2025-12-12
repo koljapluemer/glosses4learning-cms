@@ -59,6 +59,7 @@ RESPONSE_SCHEMA = {
 def translate_native_glosses(
     ctx: RunContextWrapper,
     gloss_refs: Annotated[list[str], "List of native gloss references to translate"],
+    batch_size: Annotated[int, "Batch size for LLM calls"] = 25,
 ) -> str:
     """
     Translate native language glosses to target language.
@@ -92,7 +93,7 @@ def translate_native_glosses(
     target_language = agent_ctx.target_language
 
     with LogContext(logger, tool="translate_native_glosses"):
-        logger.info(f"Translating {len(gloss_refs)} native glosses")
+        logger.info(f"Translating {len(gloss_refs)} native glosses (batch size {batch_size})")
 
         try:
             ai_note = get_ai_note(target_language)
@@ -101,17 +102,30 @@ def translate_native_glosses(
             client = get_openai_client(agent_ctx.api_key)
             results = {}
 
-            for ref in gloss_refs:
-                gloss = storage.resolve_reference(ref)
-                if not gloss:
-                    results[ref] = {"error": "Gloss not found"}
+            def chunk(seq, size):
+                for i in range(0, len(seq), size):
+                    yield seq[i : i + size]
+
+            for batch in chunk(gloss_refs, batch_size):
+                glosses = []
+                ref_map = {}
+                for ref in batch:
+                    gloss = storage.resolve_reference(ref)
+                    if not gloss:
+                        results[ref] = {"error": "Gloss not found"}
+                        continue
+                    glosses.append(gloss)
+                    ref_map[gloss.content] = ref
+
+                if not glosses:
                     continue
 
-                prompt = USER_PROMPT_TEMPLATE.format(
-                    content=gloss.content,
-                    native_language=native_language,
-                    target_language=target_language,
-                    ai_note_text=ai_note_text,
+                prompt_items = "\n".join(f"- {g.content}" for g in glosses)
+                prompt = (
+                    f"Translate these {native_language} glosses into {target_language}.\n"
+                    f"Provide 2-4 natural translations per gloss, with an optional usage note (empty string if none).\n\n"
+                    f"{prompt_items}\n\n"
+                    "Return JSON with 'translations': { gloss_content: [ {\"text\": str, \"note\": str}, ... ] }."
                 )
 
                 response = client.chat.completions.create(
@@ -121,31 +135,62 @@ def translate_native_glosses(
                         {"role": "user", "content": prompt},
                     ],
                     temperature=TEMPERATURE,
-                    max_tokens=300,
-                    response_format=RESPONSE_SCHEMA,
+                    max_tokens=1200,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "batched_translations",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "translations": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "text": {"type": "string"},
+                                                    "note": {"type": "string"},
+                                                },
+                                                "required": ["text", "note"],
+                                                "additionalProperties": False,
+                                            },
+                                        },
+                                    }
+                                },
+                                "required": ["translations"],
+                                "additionalProperties": False,
+                            },
+                            "strict": True,
+                        },
+                    },
                 )
 
                 content_str = response.choices[0].message.content.strip()
                 parsed = json.loads(content_str)
-                translations = parsed.get("translations", []) if isinstance(parsed, dict) else []
+                translations_obj = parsed.get("translations", {}) if isinstance(parsed, dict) else {}
 
-                valid_translations = []
-                for item in translations:
-                    if (
-                        isinstance(item, dict)
-                        and isinstance(item.get("text"), str)
-                        and item["text"].strip() != ""
-                        and isinstance(item.get("note"), str)
-                    ):
-                        valid_translations.append(
-                            {
-                                "text": item["text"].strip(),
-                                "note": item["note"].strip(),
-                            }
-                        )
-
-                results[ref] = valid_translations
-                logger.info(f"Translated {ref}: {len(valid_translations)} options")
+                for gloss_content, items in translations_obj.items():
+                    ref = ref_map.get(gloss_content)
+                    if not ref:
+                        continue
+                    valid_translations = []
+                    for item in items or []:
+                        if (
+                            isinstance(item, dict)
+                            and isinstance(item.get("text"), str)
+                            and item["text"].strip() != ""
+                            and isinstance(item.get("note"), str)
+                        ):
+                            valid_translations.append(
+                                {
+                                    "text": item["text"].strip(),
+                                    "note": item.get("note", "").strip(),
+                                }
+                            )
+                    results[ref] = valid_translations
+                    logger.info(f"Translated {ref}: {len(valid_translations)} options")
 
             return json.dumps({
                 "translations": results,

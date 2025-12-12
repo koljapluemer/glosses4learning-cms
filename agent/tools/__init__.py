@@ -27,8 +27,6 @@ from agent.tools.queries.list_understanding_goals import list_understanding_goal
 # LLM tools
 from agent.tools.llm.brainstorm_situation_ideas import brainstorm_situation_ideas, brainstorm_situation_ideas_tool
 from agent.tools.llm.generate_procedural_goals import generate_procedural_goals, generate_procedural_goals_tool
-from agent.tools.llm.generate_split_gloss_parts import generate_split_gloss_parts, generate_split_gloss_parts_tool
-from agent.tools.llm.generate_translate_target_glosses import generate_translate_target_glosses, generate_translate_target_glosses_tool
 from agent.tools.llm.generate_understanding_goals import generate_understanding_goals, generate_understanding_goals_tool
 from agent.tools.llm.generate_usage_examples import generate_usage_examples, generate_usage_examples_tool
 from agent.tools.llm.generate_usage_notes import generate_usage_notes, generate_usage_notes_tool
@@ -36,8 +34,8 @@ from agent.tools.llm.judge_expression_goals_coverage import judge_expression_goa
 from agent.tools.llm.judge_glosses_splittable import judge_glosses_splittable, judge_glosses_splittable_tool
 from agent.tools.llm.judge_understanding_goals_coverage import judge_understanding_goals_coverage, judge_understanding_goals_coverage_tool
 from agent.tools.llm.judge_usage_examples_useful import judge_usage_examples_useful, judge_usage_examples_useful_tool
-from agent.tools.llm.translate_native_glosses import translate_native_glosses, translate_native_glosses_tool
-from agent.tools.llm.translate_paraphrased_native import translate_paraphrased_native, translate_paraphrased_native_tool
+from agent.tools.maintenance.fix_missing_parts import fix_missing_parts
+from agent.tools.maintenance.fix_missing_translations import fix_missing_translations
 
 
 def get_all_tools() -> list:
@@ -74,17 +72,15 @@ def get_all_tools() -> list:
         # LLM tools (13 - ALL IMPLEMENTED)
         generate_procedural_goals,
         generate_understanding_goals,
-        translate_paraphrased_native,
-        translate_native_glosses,
         judge_usage_examples_useful,
         generate_usage_examples,
-        judge_glosses_splittable,
-        generate_split_gloss_parts,
-        generate_translate_target_glosses,
         generate_usage_notes,
         judge_expression_goals_coverage,
         judge_understanding_goals_coverage,
         brainstorm_situation_ideas,
+        # Batch maintenance tools
+        fix_missing_parts,
+        fix_missing_translations,
     ]
 
 
@@ -117,17 +113,15 @@ def get_all_tool_wrappers() -> list:
         # LLM wrappers
         generate_procedural_goals_tool,
         generate_understanding_goals_tool,
-        translate_paraphrased_native_tool,
-        translate_native_glosses_tool,
         judge_usage_examples_useful_tool,
         generate_usage_examples_tool,
-        judge_glosses_splittable_tool,
-        generate_split_gloss_parts_tool,
-        generate_translate_target_glosses_tool,
         generate_usage_notes_tool,
         judge_expression_goals_coverage_tool,
         judge_understanding_goals_coverage_tool,
         brainstorm_situation_ideas_tool,
+        # Batch maintenance wrappers
+        fix_missing_parts,
+        fix_missing_translations,
     ]
 
 
@@ -156,16 +150,14 @@ __all__ = [
     # LLM tools
     "generate_procedural_goals",
     "generate_understanding_goals",
-    "translate_paraphrased_native",
-    "translate_native_glosses",
     "judge_usage_examples_useful",
     "generate_usage_examples",
-    "judge_glosses_splittable",
-    "generate_split_gloss_parts",
-    "generate_translate_target_glosses",
     "generate_usage_notes",
     "judge_expression_goals_coverage",
     "judge_understanding_goals_coverage",
     "brainstorm_situation_ideas",
+    # Batch tools
+    "fix_missing_parts",
+    "fix_missing_translations",
     "get_all_tool_wrappers",
 ]
