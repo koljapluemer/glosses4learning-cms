@@ -25,7 +25,7 @@ USER_PROMPT_TEMPLATE = """For each gloss below, judge if it can be reasonably sp
 Glosses to judge:
 {glosses_text}
 
-Return JSON with a "judgments" object mapping each gloss content to a boolean."""
+Return JSON mapping each gloss content to a boolean."""
 
 
 def judge_glosses_splittable(
@@ -87,14 +87,9 @@ def judge_glosses_splittable(
                         "name": "splittability_judgments",
                         "schema": {
                             "type": "object",
-                            "properties": {
-                                "judgments": {
-                                    "type": "object",
-                                    "additionalProperties": {"type": "boolean"},
-                                }
-                            },
-                            "required": ["judgments"],
-                            "additionalProperties": False,
+                            "properties": {},
+                            "required": [],
+                            "additionalProperties": {"type": "boolean"},
                         },
                         "strict": True,
                     },
@@ -102,8 +97,8 @@ def judge_glosses_splittable(
             )
 
             content = response.choices[0].message.content.strip()
-            data = json.loads(content)
-            judgments_by_content = data.get("judgments", {})
+            data = json.loads(content) if content else {}
+            judgments_by_content = data if isinstance(data, dict) else {}
 
             # Map back to gloss refs
             result = {}

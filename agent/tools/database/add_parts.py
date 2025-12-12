@@ -8,7 +8,7 @@ from agents.run_context import RunContextWrapper
 from agents.tool import function_tool
 
 from agent.logging_config import LogContext
-from src.shared.storage import attach_relation
+from src.shared.storage import Gloss, attach_relation, derive_slug
 
 def add_parts(
     ctx: RunContextWrapper,
@@ -55,11 +55,22 @@ def add_parts(
 
             for part_ref in part_refs:
                 try:
-                    # Load part gloss to validate it exists
+                    # Ensure part gloss exists; create if missing using slug/content
                     part_gloss = storage.resolve_reference(part_ref)
                     if not part_gloss:
-                        errors.append(f"Part not found: {part_ref}")
-                        continue
+                        if ":" not in part_ref:
+                            errors.append(f"Invalid part reference: {part_ref}")
+                            continue
+                        lang, slug = part_ref.split(":", 1)
+                        lang = lang.strip().lower()
+                        slug = derive_slug(slug.strip())
+                        if not lang or not slug:
+                            errors.append(f"Invalid part reference: {part_ref}")
+                            continue
+                        # Use slug as content placeholder; caller should refine later if needed.
+                        part_gloss = Gloss(content=slug, language=lang)
+                        part_gloss = storage.create_gloss(part_gloss)
+                        logger.info(f"Created missing part gloss: {part_ref}")
 
                     # Verify same language (within-language relationship)
                     if part_gloss.language != gloss.language:

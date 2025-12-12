@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -15,6 +17,7 @@ from agent.config import DATA_ROOT, DEFAULT_AGENT_MODEL, DEFAULT_MAX_ITERATIONS
 from agent.context import AgentContext
 from agent.logging_config import setup_agent_logging
 from agent.tools import get_all_tool_wrappers
+from openai import RateLimitError
 from src.shared.state import get_api_key, load_state, save_state
 from src.shared.storage import Gloss, GlossStorage
 
@@ -184,12 +187,47 @@ def run_agent_simple(
         "Improve coverage until goals are well covered. Act using the available tools."
     )
 
-    result = Runner.run_sync(
-        agent,
-        initial_prompt,
-        context={"agent_context": agent_ctx},
-        max_turns=max_iterations,
-    )
+    def _retry_delay_seconds(exc: RateLimitError, fallback: float) -> float:
+        # Extract "try again in Xs" if present; otherwise use fallback.
+        msg = str(exc)
+        match = re.search(r"try again in ([0-9]+(?:\\.[0-9]+)?)s", msg)
+        if match:
+            try:
+                return max(fallback, float(match.group(1)))
+            except Exception:
+                return fallback
+        return fallback
+
+    result = None
+    max_attempts = 5
+    delay = 2.0
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = Runner.run_sync(
+                agent,
+                initial_prompt,
+                context={"agent_context": agent_ctx},
+                max_turns=max_iterations,
+            )
+            break
+        except RateLimitError as e:
+            wait = _retry_delay_seconds(e, delay)
+            logger.warning(
+                "Rate limit hit (attempt %d/%d). Waiting %.2fs then retrying. Error: %s",
+                attempt,
+                max_attempts,
+                wait,
+                e,
+            )
+            time.sleep(wait)
+            delay = min(delay * 2, 30.0)
+            continue
+    if result is None:
+        return {
+            "success": False,
+            "session_id": session_id,
+            "error": "Rate limit exceeded after retries; please try again later.",
+        }
 
     final_output = getattr(result, "final_output", None)
     print(f"\n{'='*60}")

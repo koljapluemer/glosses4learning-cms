@@ -39,7 +39,7 @@ Do NOT translate literally. Find how people REALLY EXPRESS this concept.
 
 Return JSON with translations array. Each item:
 - "text": the actual expression (REQUIRED)
-- "note": usage guidance in {native_language} ONLY if needed, e.g., formality level, context (OPTIONAL)"""
+- "note": usage guidance in {native_language}; use an empty string if no note is needed (REQUIRED)"""
 
 RESPONSE_SCHEMA = {
     "type": "json_schema",
@@ -56,7 +56,7 @@ RESPONSE_SCHEMA = {
                             "text": {"type": "string"},
                             "note": {"type": "string"},
                         },
-                        "required": ["text"],
+                        "required": ["text", "note"],
                         "additionalProperties": False,
                     },
                 }
@@ -145,14 +145,22 @@ def translate_paraphrased_native(
                 )
 
                 content_str = response.choices[0].message.content.strip()
-                parsed = json.loads(content_str)
+                parsed = json.loads(content_str) if content_str else {}
                 translations = parsed.get("translations", []) if isinstance(parsed, dict) else []
 
                 # Validate and clean
                 valid_translations = []
                 for item in translations:
-                    if isinstance(item, dict) and isinstance(item.get("text"), str) and item["text"].strip():
-                        valid_translations.append(item)
+                    if (
+                        isinstance(item, dict)
+                        and isinstance(item.get("text"), str)
+                        and item["text"].strip() != ""
+                        and isinstance(item.get("note"), str)
+                    ):
+                        valid_translations.append({
+                            "text": item["text"].strip(),
+                            "note": item.get("note", "").strip(),
+                        })
 
                 results[ref] = valid_translations
                 logger.info(f"Translated {ref}: {len(valid_translations)} expressions")

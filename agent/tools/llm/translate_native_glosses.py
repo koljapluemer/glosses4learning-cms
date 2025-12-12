@@ -26,7 +26,7 @@ Include usage notes ONLY when there are important distinctions (formality, conte
 
 Return JSON with translations array. Each item:
 - "text": the translation (REQUIRED)
-- "note": usage note in {native_language} (OPTIONAL, only if needed)"""
+- "note": usage note in {native_language}; use an empty string if not needed (REQUIRED)"""
 
 RESPONSE_SCHEMA = {
     "type": "json_schema",
@@ -43,7 +43,7 @@ RESPONSE_SCHEMA = {
                             "text": {"type": "string"},
                             "note": {"type": "string"},
                         },
-                        "required": ["text"],
+                        "required": ["text", "note"],
                         "additionalProperties": False,
                     },
                 }
@@ -131,8 +131,18 @@ def translate_native_glosses(
 
                 valid_translations = []
                 for item in translations:
-                    if isinstance(item, dict) and isinstance(item.get("text"), str) and item["text"].strip():
-                        valid_translations.append(item)
+                    if (
+                        isinstance(item, dict)
+                        and isinstance(item.get("text"), str)
+                        and item["text"].strip() != ""
+                        and isinstance(item.get("note"), str)
+                    ):
+                        valid_translations.append(
+                            {
+                                "text": item["text"].strip(),
+                                "note": item["note"].strip(),
+                            }
+                        )
 
                 results[ref] = valid_translations
                 logger.info(f"Translated {ref}: {len(valid_translations)} options")
