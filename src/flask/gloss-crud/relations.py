@@ -3,33 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from src.shared.storage import Gloss, GlossStorage, RELATIONSHIP_FIELDS, derive_slug
-
-WITHIN_LANGUAGE_RELATIONS = {
-    "morphologically_related",
-    "parts",
-    "has_similar_meaning",
-    "sounds_similar",
-    "usage_examples",
-    "to_be_differentiated_from",
-    "collocations",
-    "typical_follow_up",
-}
-
-CROSS_LANGUAGE_RELATIONS = {
-    "translations",
-    "notes",
-    "tags",
-    "children",
-}
-
-SYMMETRICAL_RELATIONS = {
-    "morphologically_related",
-    "has_similar_meaning",
-    "sounds_similar",
-    "to_be_differentiated_from",
-    "translations",
-}
+from src.shared.storage import (
+    Gloss,
+    GlossStorage,
+    RELATIONSHIP_FIELDS,
+    WITHIN_LANGUAGE_RELATIONS,
+    CROSS_LANGUAGE_RELATIONS,
+    SYMMETRICAL_RELATIONS,
+    attach_relation,
+    derive_slug,
+)
 
 FIELD_LABELS = {
     "morphologically_related": "Morphologically related",
@@ -98,23 +81,8 @@ def relation_rows(storage: GlossStorage, base: Gloss, field: str) -> list[Relati
     return rows
 
 
-def attach_relation(storage: GlossStorage, base: Gloss, field: str, target: Gloss) -> None:
-    if field not in RELATIONSHIP_FIELDS:
-        raise ValueError(f"Unknown relation field: {field}")
-    if field in WITHIN_LANGUAGE_RELATIONS and target.language != base.language:
-        raise ValueError("This relationship must stay within the same language.")
-
-    ref = f"{target.language}:{target.slug or derive_slug(target.content)}"
-    existing: Iterable[str] = getattr(base, field, []) or []
-    if ref not in existing:
-        setattr(base, field, list(existing) + [ref])
-        storage.save_gloss(base)
-
-    if field in SYMMETRICAL_RELATIONS:
-        _ensure_symmetry(storage, base, target, field)
-
-
 def detach_relation(storage: GlossStorage, base: Gloss, field: str, target_ref: str) -> None:
+    """Detach a relationship between glosses (Flask UI only)."""
     if field not in RELATIONSHIP_FIELDS:
         raise ValueError(f"Unknown relation field: {field}")
     existing: list[str] = list(getattr(base, field, []) or [])
@@ -125,14 +93,6 @@ def detach_relation(storage: GlossStorage, base: Gloss, field: str, target_ref: 
 
     if field in SYMMETRICAL_RELATIONS:
         _remove_symmetry(storage, base, field, target_ref)
-
-
-def _ensure_symmetry(storage: GlossStorage, base: Gloss, target: Gloss, field: str) -> None:
-    back_ref = f"{base.language}:{base.slug or derive_slug(base.content)}"
-    relations = getattr(target, field, []) or []
-    if back_ref not in relations:
-        setattr(target, field, list(relations) + [back_ref])
-        storage.save_gloss(target)
 
 
 def _remove_symmetry(storage: GlossStorage, base: Gloss, field: str, target_ref: str) -> None:

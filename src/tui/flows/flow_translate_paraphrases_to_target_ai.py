@@ -5,8 +5,10 @@ import logging
 
 from prompt_toolkit.shortcuts import checkboxlist_dialog, message_dialog, ProgressBar
 
+from src.shared.gloss_operations import attach_translation_with_note
 from src.shared.languages import get_ai_note
-from src.shared.storage import GlossStorage, attach_relation
+from src.shared.llm_client import get_openai_client
+from src.shared.storage import GlossStorage
 from src.shared.tree import collect_situation_stats
 
 logger = logging.getLogger(__name__)
@@ -41,14 +43,6 @@ Return JSON with translations array. Each item:
 """
 
 
-def _openai_client(api_key: str):
-    try:
-        from openai import OpenAI
-    except Exception as exc:  # noqa: BLE001
-        raise RuntimeError("Install openai package: pip install openai") from exc
-    return OpenAI(api_key=api_key)
-
-
 def translate_paraphrase(
     api_key: str, content: str, target_language: str, native_language: str, ai_note: str = ""
 ) -> list[dict]:
@@ -58,7 +52,7 @@ def translate_paraphrase(
     Returns:
         List of dicts with 'text' (required) and 'note' (optional) keys
     """
-    client = _openai_client(api_key)
+    client = get_openai_client(api_key)
     ai_note_text = f"Notes for this language: {ai_note}." if ai_note else ""
     prompt = PARAPHRASE_USER_PROMPT.format(
         content=content,
@@ -113,39 +107,6 @@ def translate_paraphrase(
         if isinstance(item, dict) and isinstance(item.get("text"), str) and item["text"].strip():
             result.append(item)
     return result
-
-
-def attach_translation_with_note(
-    storage: GlossStorage,
-    native_gloss,
-    translation_text: str,
-    target_language: str,
-    note_text: str | None,
-    native_language: str,
-) -> None:
-    """
-    Attach translation to native gloss with optional note.
-
-    Args:
-        storage: GlossStorage instance
-        native_gloss: Source gloss in native language
-        translation_text: Translation text
-        target_language: Target language code
-        note_text: Optional note in native language
-        native_language: Native language code
-    """
-    # Create translation gloss in target language
-    translation_gloss = storage.ensure_gloss(target_language, translation_text)
-
-    # Bidirectional translation relation
-    attach_relation(storage, native_gloss, "translations", translation_gloss)
-    attach_relation(storage, translation_gloss, "translations", native_gloss)
-
-    # One-way note relation (if note exists)
-    # Note is in native language, attached TO the target translation
-    if note_text and note_text.strip():
-        note_gloss = storage.ensure_gloss(native_language, note_text.strip())
-        attach_relation(storage, translation_gloss, "notes", note_gloss)
 
 
 def flow_translate_paraphrases_to_target_ai(storage: GlossStorage, state: dict):

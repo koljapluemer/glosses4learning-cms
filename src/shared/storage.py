@@ -26,6 +26,33 @@ RELATIONSHIP_FIELDS = [
     "tags",
 ]
 
+# Relationship type constraints
+WITHIN_LANGUAGE_RELATIONS = {
+    "morphologically_related",
+    "parts",
+    "has_similar_meaning",
+    "sounds_similar",
+    "usage_examples",
+    "to_be_differentiated_from",
+    "collocations",
+    "typical_follow_up",
+}
+
+CROSS_LANGUAGE_RELATIONS = {
+    "translations",
+    "notes",
+    "tags",
+    "children",
+}
+
+SYMMETRICAL_RELATIONS = {
+    "morphologically_related",
+    "has_similar_meaning",
+    "sounds_similar",
+    "to_be_differentiated_from",
+    "translations",
+}
+
 
 def normalize_language_code(code: str | None) -> str:
     return (code or "").strip().lower()
@@ -205,12 +232,41 @@ class GlossStorage:
             json.dump(payload, handle, indent=2, ensure_ascii=False)
 
 
-def attach_relation(storage: GlossStorage, source: Gloss, field: str, target: Gloss) -> None:
+def _ensure_symmetry(storage: GlossStorage, base: Gloss, target: Gloss, field: str) -> None:
+    """Ensure bidirectional relationship for symmetrical relations."""
+    back_ref = f"{base.language}:{base.slug or derive_slug(base.content)}"
+    relations = getattr(target, field, []) or []
+    if back_ref not in relations:
+        setattr(target, field, list(relations) + [back_ref])
+        storage.save_gloss(target)
+
+
+def attach_relation(storage: GlossStorage, base: Gloss, field: str, target: Gloss) -> None:
+    """
+    Attach a relationship between two glosses.
+
+    Handles validation for within-language vs cross-language relationships
+    and automatically maintains symmetry for bidirectional relationships.
+
+    Args:
+        storage: GlossStorage instance
+        base: Source gloss
+        field: Relationship field name
+        target: Target gloss
+
+    Raises:
+        ValueError: If field is unknown or language constraint is violated
+    """
     if field not in RELATIONSHIP_FIELDS:
-        raise ValueError(f"Unknown relationship field: {field}")
-    refs = getattr(source, field, []) or []
+        raise ValueError(f"Unknown relation field: {field}")
+    if field in WITHIN_LANGUAGE_RELATIONS and target.language != base.language:
+        raise ValueError("This relationship must stay within the same language.")
+
     ref = f"{target.language}:{target.slug or derive_slug(target.content)}"
-    if ref not in refs:
-        refs = list(refs) + [ref]
-        setattr(source, field, refs)
-        storage.save_gloss(source)
+    existing = getattr(base, field, []) or []
+    if ref not in existing:
+        setattr(base, field, list(existing) + [ref])
+        storage.save_gloss(base)
+
+    if field in SYMMETRICAL_RELATIONS:
+        _ensure_symmetry(storage, base, target, field)
