@@ -89,6 +89,16 @@
       "type": "array",
       "items": { "$ref": "#/$defs/GlossRef" },
       "default": []
+    },
+    "needsHumanCheck": {
+      "type": "boolean",
+      "description": "Flag indicating this gloss needs manual human review.",
+      "default": false
+    },
+    "excludeFromLearning": {
+      "type": "boolean",
+      "description": "Flag to exclude this gloss from learning exports.",
+      "default": false
     }
   },
   "required": ["content"],

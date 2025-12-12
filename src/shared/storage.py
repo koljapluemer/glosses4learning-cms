@@ -95,6 +95,8 @@ class Gloss:
     translations: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
+    needsHumanCheck: bool = False
+    excludeFromLearning: bool = False
     slug: str | None = None
 
     @classmethod
@@ -116,6 +118,8 @@ class Gloss:
             translations=list(data.get("translations", []) or []),
             notes=list(data.get("notes", []) or []),
             tags=list(data.get("tags", []) or []),
+            needsHumanCheck=bool(data.get("needsHumanCheck", False)),
+            excludeFromLearning=bool(data.get("excludeFromLearning", False)),
             slug=slug,
         )
 
@@ -137,6 +141,8 @@ class Gloss:
             "translations": self.translations,
             "notes": self.notes,
             "tags": self.tags,
+            "needsHumanCheck": self.needsHumanCheck,
+            "excludeFromLearning": self.excludeFromLearning,
         }
 
 

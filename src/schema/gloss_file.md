@@ -25,6 +25,18 @@ It's...well, the gloss itself, for example "banana" or "ich renne" or "It rained
 - A dictionary where keys are ISO timestamps (`2024-08-01T12:00:00Z`) and values are free-form strings
 - Used for lightweight audit or workflow markers such as `SPLIT_CONSIDERED_UNNECESSARY`
 
+#### `needsHumanCheck`
+
+- Boolean flag (optional, defaults to `false`)
+- Indicates this gloss needs manual human review, typically flagged by AI tools or automated processes
+- Glosses with this flag set are displayed with strikethrough in the tree visualization and excluded from exports
+
+#### `excludeFromLearning`
+
+- Boolean flag (optional, defaults to `false`)
+- Marks this gloss to be excluded from learning exports (e.g., situation exports for learning apps)
+- Glosses with this flag set are displayed with strikethrough in the tree visualization
+
 ### Relationships to other Glosses
 
 Relationships to other glosses are generally encoded as "$iso_code:$slug" (`slug` is equivalent to `content` with characters that are illegal in filenames removed)

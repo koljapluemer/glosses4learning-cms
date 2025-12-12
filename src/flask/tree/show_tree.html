@@ -65,7 +65,11 @@
                         <span class="badge {{ state_class }} uppercase">{{ node.state }}</span>
                       {% endif %}
                       <i data-lucide="{{ icon_for_role(node.role) }}" class="w-4 h-4"></i>
-                      <span class="{{ 'font-semibold' if node.bold else '' }}">{{ node.display or node.gloss.content }}</span>
+                      {% set strikethrough = node.gloss.needsHumanCheck or node.gloss.excludeFromLearning %}
+                      <span class="{{ 'font-semibold' if node.bold else '' }} {{ 'line-through text-base-300' if strikethrough else '' }}">{{ node.display or node.gloss.content }}</span>
+                      {% if strikethrough %}
+                        <span class="badge badge-xs badge-warning ml-1">{{ 'CHECK' if node.gloss.needsHumanCheck else 'NOLEARN' }}</span>
+                      {% endif %}
                       {% if node.warn_native_missing or node.warn_target_missing %}<i data-lucide="languages" class="w-4 h-4 text-warning" title="Translation missing"></i>{% endif %}
                       {% if node.warn_usage_missing %}<i data-lucide="message-square-warning" class="w-4 h-4 text-warning" title="Usage missing"></i>{% endif %}
                       {% if node.warn_parts_missing %}<i data-lucide="layers" class="w-4 h-4 text-warning" title="Parts missing"></i>{% endif %}
@@ -90,7 +94,11 @@
                       <span class="badge {{ state_class }} uppercase">{{ node.state }}</span>
                     {% endif %}
                     <i data-lucide="{{ icon_for_role(node.role) }}" class="w-4 h-4"></i>
-                    <span class="{{ 'font-semibold' if node.bold else '' }}">{{ node.display or node.gloss.content }}</span>
+                    {% set strikethrough = node.gloss.needsHumanCheck or node.gloss.excludeFromLearning %}
+                    <span class="{{ 'font-semibold' if node.bold else '' }} {{ 'line-through text-base-300' if strikethrough else '' }}">{{ node.display or node.gloss.content }}</span>
+                    {% if strikethrough %}
+                      <span class="badge badge-xs badge-warning ml-1">{{ 'CHECK' if node.gloss.needsHumanCheck else 'NOLEARN' }}</span>
+                    {% endif %}
                     {% if node.warn_native_missing or node.warn_target_missing %}<i data-lucide="languages" class="w-4 h-4 text-warning" title="Translation missing"></i>{% endif %}
                     {% if node.warn_usage_missing %}<i data-lucide="message-square-warning" class="w-4 h-4 text-warning" title="Usage missing"></i>{% endif %}
                     {% if node.warn_parts_missing %}<i data-lucide="layers" class="w-4 h-4 text-warning" title="Parts missing"></i>{% endif %}

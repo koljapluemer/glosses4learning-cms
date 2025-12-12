@@ -159,6 +159,8 @@ def create_gloss():
                 content=content,
                 language=language,
                 transcriptions=_parse_transcriptions(form_transcriptions),
+                needsHumanCheck=request.form.get("needsHumanCheck") == "on",
+                excludeFromLearning=request.form.get("excludeFromLearning") == "on",
             )
             gloss = storage.create_gloss(gloss)
             flash(f"Created gloss {language}:{gloss.slug}", "success")
@@ -182,6 +184,8 @@ def edit_gloss(language: str, slug: str):
     if request.method == "POST":
         gloss.content = request.form.get("content", "").strip()
         gloss.transcriptions = _parse_transcriptions(request.form.get("transcriptions"))
+        gloss.needsHumanCheck = request.form.get("needsHumanCheck") == "on"
+        gloss.excludeFromLearning = request.form.get("excludeFromLearning") == "on"
         if not gloss.content:
             flash("Content is required.", "error")
         else:

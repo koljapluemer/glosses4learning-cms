@@ -50,6 +50,20 @@
               <label class="label">Content *</label>
               <textarea name="content" class="textarea" required placeholder="Surface form or definition">{{ gloss.content }}</textarea>
             </fieldset>
+            <div class="grid md:grid-cols-2 gap-4 mt-4">
+              <fieldset class="fieldset">
+                <label class="label cursor-pointer justify-start gap-3">
+                  <input type="checkbox" name="needsHumanCheck" class="checkbox" {% if gloss.needsHumanCheck %}checked{% endif %}>
+                  <span>Needs Human Check</span>
+                </label>
+              </fieldset>
+              <fieldset class="fieldset">
+                <label class="label cursor-pointer justify-start gap-3">
+                  <input type="checkbox" name="excludeFromLearning" class="checkbox" {% if gloss.excludeFromLearning %}checked{% endif %}>
+                  <span>Exclude from Learning</span>
+                </label>
+              </fieldset>
+            </div>
           </div>
         </div>
 

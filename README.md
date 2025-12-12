@@ -18,9 +18,16 @@ CLI/TUI tools (prompt_toolkit) and a tiny Flask view for managing gloss JSON fil
    - Add usage examples (AI)
 4. State persists in `src/shared/state.json`; logs in `src/shared/log_files/app.log`.
 
+## Tkinter Gloss Management UI
+A desktop GUI for reviewing and fixing AI-generated content:
+
+```bash
+uv run python tk/main.py
+```
+
 ## Flask apps
-- Tree viewer (read-only): `uv run flask --app src.flask.tree.show_tree run --debug --port 5010`  
-- Gloss CRUD UI: `uv run flask --app src/flask/gloss-crud/app.py run --debug --port 5011`  
+- Tree viewer (read-only): `uv run flask --app src.flask.tree.show_tree run --debug --port 5010`
+- Gloss CRUD UI: `uv run flask --app src/flask/gloss-crud/app.py run --debug --port 5011`
 - Situation goals overview (read-only): `uv run flask --app src/flask/situation-goals/app.py run --debug --port 5012`
 
 Port collisions: every app defaults to 5000, so always pass `--port` (or `FLASK_RUN_PORT`) and stick to fixed ports per tool (e.g., 5010 tree, 5011 CRUD, 5012 goals). If something else is using a port, just bump the number when launching.

@@ -106,15 +106,24 @@ def _build_export_payload(
         return None, "No learnable content"
 
     jsonl_lines = []
+    excluded_count = 0
     for ref in sorted(all_refs):
         gloss = storage.resolve_reference(ref)
         if not gloss:
+            continue
+        # Skip glosses flagged for exclusion
+        if getattr(gloss, "needsHumanCheck", False) or getattr(gloss, "excludeFromLearning", False):
+            excluded_count += 1
             continue
         item = gloss.to_dict()
         item["ref"] = ref
         jsonl_lines.append(json.dumps(item, ensure_ascii=False))
 
-    stats = {"goal_count": len(goal_nodes), "gloss_count": len(all_refs)}
+    stats = {
+        "goal_count": len(goal_nodes),
+        "gloss_count": len(all_refs),
+        "excluded_count": excluded_count,
+    }
     return (
         {
             "export_obj": export_obj,
