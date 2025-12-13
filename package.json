@@ -1,0 +1,40 @@
+{
+  "name": "glosses4learning-cms",
+  "version": "1.0.0",
+  "description": "Electron + Vue CMS for language learning glosses",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "lint": "eslint app --ext .ts,.vue",
+    "typecheck": "vue-tsc --noEmit",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "@openai/agents": "^0.3.4",
+    "electron-store": "^11.0.2",
+    "lucide-vue-next": "^0.561.0",
+    "vue": "^3.5.25",
+    "vue-router": "^4.6.4",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^25.0.1",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/eslint-config-typescript": "^14.6.0",
+    "daisyui": "latest",
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^5.0.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-vue": "^10.6.2",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.49.0",
+    "vite": "^7.2.7",
+    "vue-tsc": "^3.1.8"
+  }
+}

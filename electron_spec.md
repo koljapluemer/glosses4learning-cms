@@ -87,7 +87,7 @@ Should live in `app/` and be written in JS, so no dependencies on any python cod
         - require no explicit save button for the whole modal, since all the relationship edits are "live" anyways
 
 
-## Stack
+## General
 
 - we should still use `data/` and `situations/` (via git submodules) as source of truth
 - when referencing a gloss, just render its `content` (not its identifier, and not its language unless specified in the spec)
@@ -97,6 +97,19 @@ Should live in `app/` and be written in JS, so no dependencies on any python cod
 - when adding or generating a gloss, there is always a chance that this gloss (as identified by the identifier in the form of `$iso_code:$slugified_content` already exist). In that case, code should NOT fail, but simply work with the existing gloss and update relationships accordingly (unless specified differently) 
 - on AI suggestion confirm/reject list dialogs, as a rule, pre-select all items
 - Generall, A LOT OF THIS LOGIC IS ALREADY IMPLEMENTED IN THIS CODE BASE (only in python) AND ALSO BESPOKE!! Glosses and their relationships and specific LLM tools are used and meant to be used in VERY SPECIFIC WAYS which cannot necessarily be reverse engineered by looking at their descriptors. Make sure to THOROUGHLY understand the existing state and ALWAYS SEARCH FOR relevant inspiration before building.
+- This is an INTERNAL EXPERT APP. The users are deeply involved into both the tech and the domain. Therefore, refrain strictly from overexplanation, cutesy messages, bragging about the awesomeness of features, extra labels and descriptive text as well as marketing speak OF ANY KIND.
+
+
+- Keep design lean. Use cards, wrapper divs and containers ONLY when necessary
+- Keep style consistent across the code base
+- Setup eslint and ensure green linter (not by disabling it, but by writing clean code)
+- Keep files, functions and classes short, with a single purpose, on one abstraction layer. Split complex functionality when called for.
+- Do not hallucinate features I did not ask for
+
+- NO PYTHON! Implement as clean TS!!!!!!!! app (no subprocess hacking memes etc.)
+
+- Use openai agents sdk: https://github.com/openai/openai-agents-js (yes, ACTUALLY UTILIZE THIS REAL LIBRARY. not possibly later, no, in this implementation use this actual sdk.)
+- WRITE CLEAN CODE!!!!! Linting issues are to be fixed by fixing the fucking issues, not by disabling the linter!!
 
 ## Architecture
 
@@ -112,4 +125,100 @@ Instead, use the following folder structure (inspired by Feature-Sliced Design)
 
 Do not use `index.ts` file reexporting components, simply export directly.
 
-## Specifically needed components.
+## Specifically needed components
+
+Proposed tree:
+```
+app/
+  main.ts                 # electron main; ipc + file access sandboxing
+  preload.ts              # expose limited fs/api surface to renderer
+  router.ts               # Vue router with Overview + goal tabs
+  tailwind.css
+dumb/
+  components/ModalShell.vue
+  components/TabRail.vue
+  components/ToastStack.vue
+  components/TreeRow.vue
+  components/InlineAddField.vue
+entities/
+  glosses/
+    types.ts
+    slug.ts
+    fsGlossStorage.ts
+    relationRules.ts
+    referenceCheck.ts
+    treeBuilder.ts
+    goalState.ts
+  languages/
+    loader.ts
+    symbols.ts
+  situations/
+    finder.ts
+    recentState.ts
+  system/
+    ipcClient.ts
+    settingsStore.ts
+features/
+  situation-picker/
+    SituationPicker.vue
+    useSituationPicker.ts
+  goal-overview-table/
+    GoalOverviewTable.vue
+    useGoalOverviewActions.ts
+  goal-tab-frame/
+    GoalTabFrame.vue
+    useGoalRouting.ts
+  gloss-tree-panel/
+    GlossTreePanel.vue
+    useTreeInteractions.ts
+  gloss-modal/
+    GlossModal.vue
+    useGlossEdits.ts
+  ai-batch-tools/
+    AiBatchToolPanel.vue
+    useAiGeneration.ts
+  toast-center/
+    ToastCenter.vue
+    useToasts.ts
+meta/
+  situation-workspace/
+    SituationWorkspace.vue
+    useWorkspaceLoader.ts
+pages/
+  dashboard/
+    DashboardPage.vue
+    useDashboardData.ts
+```
+
+Component logic + considerations + open questions:
+- `app/main.ts` + `preload.ts`: constrain fs access to `data/` + `situations/`, stream reads/writes instead of bulk loading; mirror `src/shared/storage.py` behaviour for path layout. Open question: do we need background worker for long AI runs vs blocking renderer? *as simple as possible right now, we will optimize/async/nonblock when it actually becomes a problem*
+- `entities/glosses/slug.ts`: exact port of `derive_slug` from `src/shared/storage.py` (illegal char stripping, truncation) to avoid regressions. Critical that only one slug generator exists.
+- `entities/glosses/fsGlossStorage.ts`: JS analogue of `GlossStorage` with `resolve_reference`, `ensure_gloss`, `create_gloss`, `save_gloss`, symmetric attach per `relationRules` (copy `RELATIONSHIP_FIELDS`, `WITHIN_LANGUAGE_RELATIONS`, `SYMMETRICAL_RELATIONS`). Use lazy file reads and per-language iterators to avoid loading millions of glosses at once. Inspiration: `src/shared/storage.py`, `src/flask/gloss-crud/relations.py`.
+- `entities/glosses/referenceCheck.ts`: helper for “content change” confirmation modal (scan usages in `parts`, `usage_examples`, `translations`) akin to `_update_references` in `src/flask/gloss-crud/app.py`.
+- `entities/glosses/treeBuilder.ts` + `goalState.ts`: port of `build_goal_nodes`, `render_tree_text`, and `evaluate_goal_state` from `src/shared/tree.py` to drive tree rendering + RED/YELLOW/GREEN badges and warnings. Keep same markers (`SPLIT_CONSIDERED_UNNECESSARY`, `TRANSLATION_CONSIDERED_IMPOSSIBLE`, `USAGE_EXAMPLE_CONSIDERED_IMPOSSIBLE`).
+- `entities/languages/loader.ts`: read from `data/language/*.json`; reuse shape from `src/schema/language.schema.json`. Needed for dropdowns + symbols. Inspiration: `src/shared/languages.py`.
+- `entities/situations/finder.ts`: stream situations tagged `eng:situation`, provide substring filter + creation. Reuse attach logic from `agent/tools/database/attach_to_situation.py` + goal adders. Ensure new situations default to English language.
+- `features/situation-picker`: modal for language switch + situation list/add/delete; uses `finder.ts` and `fsGlossStorage` attach/detach; confirm delete with cleanup mirroring `src/shared/gloss_actions.delete_gloss_with_cleanup`.
+- `features/goal-overview-table`: table of goals with detach/delete/edit actions, badges for state; uses `goalState.ts`; triggers `gloss-modal` for edits. Should call storage detach mirroring `relations.detach_relation`. Inspiration: `src/flask/situation-goals/app.py` and `agent/tools/database/add_gloss_*`.
+- `features/goal-tab-frame`: drives router tab labels/order; ensures first tab is Overview and others sorted by type/name.
+- `features/gloss-tree-panel`: renders per-goal tree; use `treeBuilder` results; per-node actions (delete, exclude, detach, open modal). Use virtualization for huge trees and guard against cycles. Inspiration: `src/flask/tree/show_tree.html`.
+- `features/gloss-modal`: CRUD for translations/parts/usages/notes/children/flags with live saves; run pre-change usage checks via `referenceCheck`; autocomplete by streaming `fsGlossStorage` search per language; enforce symmetry and within-language constraints; warn before delete using `gloss_actions.delete_gloss_with_cleanup`. AI buttons hand off to `ai-batch-tools`.
+- `features/ai-batch-tools`: UI for “Add Understand Goals”, “Add Procedural...”, missing translations/parts/usages flows; orchestrates proposal modals with preselected items and confirmation. Logic mirrors `agent/tools/maintenance/fix_*`, `agent/tools/database/add_*`, and `src/shared/gloss_actions.py` LLM helpers (parts/translations/usages). Open question: invoke existing python flows via subprocess vs JS reimplementation of prompts. *No python ANYWHERE!!!!!!!!!! js implementation!
+- `features/toast-center`: central toast queue for success/error from storage + AI actions; keep minimal global state.
+- `meta/situation-workspace`: composes picker, overview, goal tabs, tree, AI tools into layout described in spec; keeps only current situation/goals in memory, fetches glosses on-demand. Uses `recentState` to persist last choice (similar to `src/shared/state.py`).
+- `pages/dashboard`: top-level page (router target) wiring workspace + toasts; no extra business logic.
+
+Existing inspiration to lean on:
+- Relationship + slug rules: `src/shared/storage.py`, `src/flask/gloss-crud/relations.py`, `src/shared/gloss_operations.py`.
+- Goal state + tree rendering: `src/shared/tree.py`, `src/flask/tree/show_tree.html`.
+- Goal creation and maintenance flows: `agent/tools/database/add_gloss_procedural.py`, `agent/tools/database/add_gloss_understanding.py`, `agent/tools/maintenance/fix_missing_translations.py`, `fix_usage_examples.py`, `fix_missing_parts.py`.
+- CRUD edge cases (rename/update refs, delete cleanup): `src/flask/gloss-crud/app.py`, `src/shared/gloss_actions.py`, `tk/operations.py`.
+- Language metadata and AI notes: `src/shared/languages.py`, `src/schema/language.schema.json`.
+
+Open questions:
+- Do we invoke existing python LLM flows from Electron (subprocess/IPC) or port prompts to JS? Needed for AI buttons and to respect existing guardrails.
+ - JS ONLY!!!!!!!!!!!!!!!!!!!!!
+- Where should API keys/settings live? Reuse `src/shared/state.json` or new Electron-safe store?
+  - electron best practice
+- Should we build any read-side index to speed substring searches without loading all glosses, or rely on incremental fs scans per language?
+  - 80/20 for now. If you can think of a simple performance boost good, but don't introduce 1000LoC just for this.

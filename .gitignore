@@ -35,3 +35,11 @@ notebooks/.ipynb_checkpoints/
 
 agent/logs/
 *.log
+
+# Electron / Node.js
+node_modules/
+dist-electron/
+dist-renderer/
+out/
+.vite/
+release/
