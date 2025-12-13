@@ -2,10 +2,10 @@
   "name": "glosses4learning-cms",
   "version": "1.0.0",
   "description": "Electron + Vue CMS for language learning glosses",
-  "main": "dist-electron/main.js",
+  "main": "out/main/index.js",
   "type": "module",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "ELECTRON_DISABLE_SANDBOX=1 electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "lint": "eslint app --ext .ts,.vue",

@@ -1,19 +1,2 @@
 @import "tailwindcss";
 @plugin "daisyui";
-
-/* Custom styles using @apply can go here */
-.fieldset {
-  @apply flex flex-col gap-1;
-}
-
-.label {
-  @apply text-sm font-medium;
-}
-
-.input {
-  @apply input input-bordered w-full;
-}
-
-.text-light {
-  @apply opacity-70;
-}

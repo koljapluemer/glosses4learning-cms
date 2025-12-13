@@ -20,11 +20,16 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'app/preload.ts')
+        },
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].js'
         }
       }
     }
   },
   renderer: {
+    root: resolve(__dirname, 'app/renderer'),
     resolve: {
       alias: {
         '@': resolve(__dirname, 'app/renderer')
@@ -33,9 +38,7 @@ export default defineConfig({
     plugins: [vue(), tailwindcss()],
     build: {
       rollupOptions: {
-        input: {
-          index: resolve(__dirname, 'app/renderer/index.html')
-        }
+        input: resolve(__dirname, 'app/renderer/index.html')
       }
     }
   }

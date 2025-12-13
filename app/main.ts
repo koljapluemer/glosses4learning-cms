@@ -16,12 +16,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // │ │ └── index.html
 
 process.env.APP_ROOT = path.join(__dirname, '..')
-export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist-renderer')
 
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
-  ? path.join(process.env.APP_ROOT, 'public')
-  : RENDERER_DIST
+// Disable sandbox for development (Linux fix)
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('no-sandbox')
+}
 
 let win: BrowserWindow | null
 
@@ -29,9 +28,8 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1400,
     height: 900,
-    icon: path.join(process.env.VITE_PUBLIC!, 'icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -42,11 +40,12 @@ function createWindow() {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
   })
 
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
+  // Standard electron-vite pattern: use ELECTRON_RENDERER_URL in dev, file in prod
+  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
+    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
     win.webContents.openDevTools()
   } else {
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'))
+    win.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 }
 
