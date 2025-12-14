@@ -10,6 +10,9 @@
         <button class="btn btn-sm" @click="showSituationPicker = true">
           {{ situationDisplay }}
         </button>
+        <button class="btn btn-sm btn-ghost btn-square" :disabled="loading || treeLoading" @click="refreshWorkspace" title="Refresh">
+          <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': treeLoading }" />
+        </button>
         <button class="btn btn-sm btn-ghost" @click="showSettings = true" title="Settings">
           <Settings class="w-4 h-4" />
         </button>
@@ -216,7 +219,8 @@ import {
   Info,
   Layers,
   Languages,
-  MessageSquareWarning
+  MessageSquareWarning,
+  RefreshCw
 } from 'lucide-vue-next'
 import OverviewTab from './OverviewTab.vue'
 import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
@@ -467,6 +471,30 @@ function openSituationGloss(situation: Gloss) {
 
 function goHome() {
   router.push({ name: 'dashboard', query: { noAutoOpen: '1' } })
+}
+
+async function refreshWorkspace() {
+  if (loading.value || treeLoading.value) return
+  try {
+    const situationLang = route.params.situationLang as string
+    const situationSlug = route.params.situationSlug as string
+    if (!situationLang || !situationSlug) {
+      error('Invalid situation parameters')
+      return
+    }
+
+    const latest = await window.electronAPI.gloss.load(situationLang, situationSlug)
+    if (!latest) {
+      error('Situation not found')
+      return
+    }
+
+    situation.value = latest
+    await refreshTree(latest)
+  } catch (err) {
+    console.error('Workspace refresh failed', err)
+    error('Failed to refresh workspace')
+  }
 }
 
 async function saveApiKey(apiKey: string) {

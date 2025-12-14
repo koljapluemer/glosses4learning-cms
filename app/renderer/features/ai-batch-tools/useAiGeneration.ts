@@ -89,7 +89,6 @@ Return JSON { "items": [ { "source": "<content>", "translations": [ {"text": str
 
 function partsPrompt(glosses: Gloss[], aiNote: string | null, options?: GenerationOptions) {
   const bullets = glosses.map((g) => `- ${g.content}`).join('\n')
-  const count = options?.count ?? 3
   const contextLine = options?.context ? `${options.context}\n\n` : ''
   const aiNoteText = aiNote ? `Language notes: ${aiNote}\n\n` : ''
   return `${contextLine}${aiNoteText}You are a concise linguistic decomposition assistant.
@@ -97,8 +96,7 @@ function partsPrompt(glosses: Gloss[], aiNote: string | null, options?: Generati
 Break expressions into learnable component parts - words or meaningful sub-expressions.
 
 Take each expression below and break it up into parts that can be learned on their own.
-
-Aim for ${count} high-value parts per expression (fewer if natural).
+Each returned item must be a meaningful standalone item.
 
 Return JSON with 'parts' array for each source.
 
@@ -116,6 +114,7 @@ function usagePrompt(glosses: Gloss[], aiNote: string | null, options?: Generati
   return `${contextLine}${aiNoteText}You generate concise usage example sentences for language learning.
 
 Create natural, practical sentences that demonstrate how the word or phrase is used in context.
+Prefer short sentences, 3-5 words is ideal.
 
 Generate ${count} example sentences that use the word/phrase.
 
