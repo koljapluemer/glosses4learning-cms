@@ -18,6 +18,7 @@
         <NodeContent :node="node" />
         <NodeActions
           :node="node"
+          :can-detach="canDetach"
           @open-gloss="$emit('open-gloss', glossRef(node.gloss))"
           @delete-gloss="handleDelete"
           @toggle-exclude="handleToggleExclude"
@@ -43,6 +44,7 @@
       <NodeContent :node="node" />
       <NodeActions
         :node="node"
+        :can-detach="canDetach"
         @open-gloss="$emit('open-gloss', glossRef(node.gloss))"
         @delete-gloss="handleDelete"
         @toggle-exclude="handleToggleExclude"
@@ -73,6 +75,7 @@ const emit = defineEmits<{
 
 const hasChildren = computed(() => props.node.children && props.node.children.length > 0)
 const isExpanded = ref(false)
+const canDetach = computed(() => Boolean(props.node.parentRef && props.node.viaField))
 
 function glossRef(gloss: typeof props.node.gloss): string {
   return `${gloss.language}:${gloss.slug}`
@@ -93,9 +96,13 @@ function handleToggleExclude() {
 }
 
 function handleDetach() {
-  const parent = props.node.parentRef
-  const field = props.node.viaField
+  if (!canDetach.value) {
+    console.error('Cannot detach: missing parent or relation on node', props.node)
+    return
+  }
+  const parent = props.node.parentRef as string
+  const field = props.node.viaField as string
   const child = glossRef(props.node.gloss)
-  emit('detach', parent || '', field || '', child)
+  emit('detach', parent, field, child)
 }
 </script>

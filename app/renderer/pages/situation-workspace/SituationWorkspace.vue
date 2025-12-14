@@ -519,7 +519,7 @@ async function detachRelation(parentRef: string, field: string, childRef: string
       for (const child of node.children) {
         const childId = `${child.gloss.language}:${child.gloss.slug}`
         if (childId === ref) {
-          return { parent: node.parentRef || `${node.gloss.language}:${node.gloss.slug}`, via: child.viaField }
+          return { parent: `${node.gloss.language}:${node.gloss.slug}`, via: child.viaField }
         }
         const deep = findParent(ref, child.children)
         if (deep) return deep
@@ -533,6 +533,25 @@ async function detachRelation(parentRef: string, field: string, childRef: string
     if (found?.parent) {
       relParent = found.parent
       if (!relField && found.via) relField = found.via
+    }
+  }
+
+  if (!relParent || !relField) {
+    const locate = (nodes: TreeNode[]): { parent?: string; via?: string } | null => {
+      for (const node of nodes) {
+        const id = `${node.gloss.language}:${node.gloss.slug}`
+        if (id === childRef) {
+          return { parent: node.parentRef, via: node.viaField }
+        }
+        const deep = locate(node.children)
+        if (deep) return deep
+      }
+      return null
+    }
+    const details = locate(treeNodes.value)
+    if (details?.parent) {
+      relParent = details.parent
+      if (!relField && details.via) relField = details.via
     }
   }
 

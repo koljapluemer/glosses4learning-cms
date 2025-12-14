@@ -16,7 +16,12 @@
     </button>
 
     <!-- Detach from parent -->
-    <button class="btn btn-ghost btn-xs" title="Detach" @click="$emit('detach')">
+    <button
+      class="btn btn-ghost btn-xs"
+      title="Detach"
+      :disabled="!canDetach"
+      @click="$emit('detach')"
+    >
       <Unlink class="w-4 h-4" />
     </button>
 
@@ -33,6 +38,7 @@ import type { TreeNode } from '../../entities/glosses/treeBuilder'
 
 defineProps<{
   node: TreeNode
+  canDetach?: boolean
 }>()
 
 defineEmits<{

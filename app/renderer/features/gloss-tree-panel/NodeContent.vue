@@ -34,6 +34,11 @@
       {{ node.gloss.needsHumanCheck ? 'CHECK' : 'NOLEARN' }}
     </span>
 
+    <!-- Parent badge -->
+    <span v-if="node.parentRef" class="badge badge-outline badge-xs">
+      parent: {{ node.parentRef }}
+    </span>
+
     <!-- Warning icons -->
     <Languages
       v-if="node.warn_native_missing || node.warn_target_missing"
