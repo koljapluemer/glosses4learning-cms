@@ -274,12 +274,5 @@ export function determineGoalState(
  * Python ref: src/shared/tree.py:225-231
  */
 export function paraphraseDisplay(gloss: Gloss): string {
-  let text = gloss.content || gloss.slug || ''
-  if (gloss.slug && !text.includes(gloss.slug)) {
-    text = `${text} (${gloss.slug})`
-  }
-  if ((gloss.tags || []).includes('eng:paraphrase')) {
-    return `[${text}]`
-  }
-  return text
+  return gloss.content || ''
 }
