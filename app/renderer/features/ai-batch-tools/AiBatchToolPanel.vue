@@ -24,12 +24,12 @@
           <h3 class="font-semibold text-lg mb-3">{{ modalTitle }}</h3>
           <p class="text-sm text-base-content/70 mb-3">{{ modalSubtitle }}</p>
           <div class="space-y-3 max-h-96 overflow-y-auto">
-            <div
-              v-for="(item, idx) in proposalList"
-              :key="idx"
-              class="border border-base-300 rounded-lg p-3 space-y-2"
-            >
-              <div class="font-semibold">{{ item.glossRef }}</div>
+<div
+  v-for="(item, idx) in proposalList"
+  :key="idx"
+  class="border border-base-300 rounded-lg p-3 space-y-2"
+>
+  <div class="font-semibold">{{ item.glossLabel }}</div>
               <div class="space-y-1">
                 <label
                   v-for="(text, i) in item.suggestions"
@@ -67,6 +67,7 @@ import { useSettings } from '../../entities/system/settingsStore'
 import { useToasts } from '../toast-center/useToasts'
 import { generateTranslations, generateParts, generateUsage } from './useAiGeneration'
 import type { Gloss } from '../../../main-process/storage/types'
+import { paraphraseDisplay } from '../../entities/glosses/goalState'
 
 const props = defineProps<{
   goalRef: string
@@ -91,7 +92,14 @@ const showModal = ref(false)
 const modalTitle = ref('')
 const modalSubtitle = ref('')
 
-type Proposal = { glossRef: string; suggestions: string[]; selected: boolean[]; kind: 'translation' | 'parts' | 'usage'; direction?: 'toNative' | 'toTarget' }
+type Proposal = {
+  glossRef: string
+  glossLabel: string
+  suggestions: string[]
+  selected: boolean[]
+  kind: 'translation' | 'parts' | 'usage'
+  direction?: 'toNative' | 'toTarget'
+}
 const proposalList = reactive<Proposal[]>([])
 
 const translationsCount = computed(
@@ -127,6 +135,10 @@ async function loadGlosses(refs: string[]): Promise<Gloss[]> {
     if (g) items.push(g)
   }
   return items
+}
+
+function glossLabel(gloss: Gloss): string {
+  return paraphraseDisplay(gloss)
 }
 
 async function runTranslations() {
@@ -171,9 +183,17 @@ async function runTranslations() {
       props.targetLanguage
     )
     const proposals: Proposal[] = []
+    const labelForRef = (ref: string) =>
+      glossLabel(
+        [...glossesNativeMissing, ...glossesTargetMissing].find(
+          (g) => `${g.language}:${g.slug}` === ref
+        ) || ({ content: ref, tags: [] } as Gloss)
+      )
+
     for (const item of toNative) {
       proposals.push({
         glossRef: item.glossRef,
+        glossLabel: labelForRef(item.glossRef),
         suggestions: item.suggestions,
         selected: item.suggestions.map(() => true),
         kind: 'translation',
@@ -183,6 +203,7 @@ async function runTranslations() {
     for (const item of toTargetPlain) {
       proposals.push({
         glossRef: item.glossRef,
+        glossLabel: labelForRef(item.glossRef),
         suggestions: item.suggestions,
         selected: item.suggestions.map(() => true),
         kind: 'translation',
@@ -192,6 +213,7 @@ async function runTranslations() {
     for (const item of toTargetParaphrase) {
       proposals.push({
         glossRef: item.glossRef,
+        glossLabel: labelForRef(item.glossRef),
         suggestions: item.suggestions,
         selected: item.suggestions.map(() => true),
         kind: 'translation',
@@ -219,9 +241,13 @@ async function runParts() {
   }
   busy.value = true
   try {
+    const glosses = await loadGlosses(props.missingPartsRefs)
+    const labelForRef = (ref: string) =>
+      glossLabel(glosses.find((g) => `${g.language}:${g.slug}` === ref) || ({ content: ref, tags: [] } as Gloss))
     const res = await generateParts(apiKey, props.missingPartsRefs)
     const proposals: Proposal[] = res.map((item) => ({
       glossRef: item.glossRef,
+      glossLabel: labelForRef(item.glossRef),
       suggestions: item.suggestions,
       selected: item.suggestions.map(() => true),
       kind: 'parts'
@@ -247,9 +273,13 @@ async function runUsage() {
   }
   busy.value = true
   try {
+    const glosses = await loadGlosses(props.missingUsageRefs)
+    const labelForRef = (ref: string) =>
+      glossLabel(glosses.find((g) => `${g.language}:${g.slug}` === ref) || ({ content: ref, tags: [] } as Gloss))
     const res = await generateUsage(apiKey, props.missingUsageRefs)
     const proposals: Proposal[] = res.map((item) => ({
       glossRef: item.glossRef,
+      glossLabel: labelForRef(item.glossRef),
       suggestions: item.suggestions,
       selected: item.suggestions.map(() => true),
       kind: 'usage'

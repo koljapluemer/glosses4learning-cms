@@ -1,6 +1,7 @@
 import { Agent, run } from '@openai/agents'
 import { OpenAIChatCompletionsModel, setDefaultOpenAIKey } from '@openai/agents-openai'
 import type { Gloss } from '../../../main-process/storage/types'
+import { loadLanguages } from '../../entities/languages/loader'
 
 const MODEL = 'gpt-4o-mini'
 const TEMP_TRANSLATION = 0.2
@@ -19,6 +20,12 @@ interface GenerationOptions {
   count?: number
 }
 
+async function getAiNote(language: string): Promise<string | null> {
+  const langs = await loadLanguages()
+  const hit = langs.find((l) => l.isoCode === language)
+  return hit?.aiNote ?? null
+}
+
 async function fetchGlosses(refs: string[]): Promise<Gloss[]> {
   const results: Gloss[] = []
   for (const ref of refs.slice(0, 50)) {
@@ -33,71 +40,114 @@ function translationPrompt(
   glosses: Gloss[],
   native: string,
   target: string,
+  aiNote: string | null,
   options?: GenerationOptions
 ) {
   const bullets = glosses.map((g) => `- ${g.content}`).join('\n')
   const count = options?.count ?? 2
-  const contextLine = options?.context ? `Context: ${options.context}\n` : ''
+  const contextLine = options?.context ? `${options.context}\n\n` : ''
+  const aiNoteText = aiNote ? `Language notes: ${aiNote}\n\n` : ''
 
   if (mode === 'paraphraseToTarget') {
-    return `${contextLine}You receive paraphrased procedural descriptions written in the learner's native language (${native}). 
-Produce up to ${count} NATURAL target-language (${target}) expressions the learner would actually SAY to achieve that intent.
-Rules:
-- Output only real target expressions, no brackets, no explanations.
-- Keep them concise and idiomatic.
-- Avoid literal translation of paraphrase phrasing.
+    return `${contextLine}${aiNoteText}You are a specialized language assistant for translating communicative goals (paraphrases) into actual expressions.
+
+CRITICAL: The input is NOT a phrase to translate literally. It is a COMMUNICATIVE GOAL describing what a learner wants to express.
+
+Your task:
+- Find the ACTUAL ways native speakers would EXPRESS this goal in the target language (${target})
+- Return real phrases/expressions, NOT literal word-for-word translations
+- Include usage notes ONLY when expressions have important context differences
+
+Provide ${count} expressions for each item.
+
 Items:
 ${bullets}
-Return JSON { "items": [ { "source": "<content>", "translations": ["..."] } ] }.`
+
+Return JSON { "items": [ { "source": "<content>", "translations": [ {"text": str, "note": str}, ... ] } ] }. Always include "note" (empty string if none).`
   }
 
   if (mode === 'toNative') {
-    return `${contextLine}Translate each target-language expression into the learner's native language (${native}). Provide up to ${count} natural equivalents.
+    return `${contextLine}${aiNoteText}Translate these ${target} glosses into ${native}.
+Provide 2-4 concise, practical translations per gloss (JSON only).
+
 Items:
 ${bullets}
+
 Return JSON { "items": [ { "source": "<content>", "translations": ["..."] } ] }.`
   }
 
-  return `${contextLine}Translate each native-language expression into target language (${target}). Provide up to ${count} concise, natural target expressions.
+  return `${contextLine}${aiNoteText}Translate these ${native} glosses into ${target}.
+Provide 2-4 natural translations per gloss with an optional usage note (empty string if none).
+
 Items:
 ${bullets}
-Return JSON { "items": [ { "source": "<content>", "translations": ["..."] } ] }.`
+
+Return JSON { "items": [ { "source": "<content>", "translations": [ {"text": str, "note": str}, ... ] } ] }.`
 }
 
-function partsPrompt(glosses: Gloss[], options?: GenerationOptions) {
+function partsPrompt(glosses: Gloss[], aiNote: string | null, options?: GenerationOptions) {
   const bullets = glosses.map((g) => `- ${g.content}`).join('\n')
   const count = options?.count ?? 3
-  const contextLine = options?.context ? `Context: ${options.context}\n` : ''
-  return `${contextLine}Split each gloss into 2-${count} constituent parts (same language). Avoid duplicates, keep short.
+  const contextLine = options?.context ? `${options.context}\n\n` : ''
+  const aiNoteText = aiNote ? `Language notes: ${aiNote}\n\n` : ''
+  return `${contextLine}${aiNoteText}You are a concise linguistic decomposition assistant.
+
+Break expressions into learnable component parts - words or meaningful sub-expressions.
+
+Take each expression below and break it up into parts that can be learned on their own.
+
+Return JSON with 'parts' array for each source.
+
 Items:
 ${bullets}
+
 Return JSON { "items": [ { "source": "<content>", "parts": ["..."] } ] }`
 }
 
-function usagePrompt(glosses: Gloss[], options?: GenerationOptions) {
+function usagePrompt(glosses: Gloss[], aiNote: string | null, options?: GenerationOptions) {
   const bullets = glosses.map((g) => `- ${g.content} (${g.language})`).join('\n')
   const count = options?.count ?? 2
-  const contextLine = options?.context ? `Context: ${options.context}\n` : ''
-  return `${contextLine}Generate ${count} short usage examples in the same language for each gloss. Keep natural and brief.
+  const contextLine = options?.context ? `${options.context}\n\n` : ''
+  const aiNoteText = aiNote ? `Language notes: ${aiNote}\n\n` : ''
+  return `${contextLine}${aiNoteText}You generate concise usage example sentences for language learning.
+
+Create natural, practical sentences that demonstrate how the word or phrase is used in context.
+
+Generate ${count} example sentences that use the word/phrase.
+
 Items:
 ${bullets}
+
 Return JSON { "items": [ { "source": "<content>", "usages": ["..."] } ] }`
 }
 
 function splitJudgePrompt(glosses: Gloss[]) {
   const bullets = glosses.map((g) => `- ${g.content}`).join('\n')
-  return `Decide if each gloss can be meaningfully split into parts. Answer yes/no.
-Items:
+  return `You judge if expressions can be split into learnable parts.
+
+Single words cannot be split (false).
+Multi-word phrases or expressions can be split into component words or sub-expressions (true).
+
+For each gloss below, judge true/false.
+
+Glosses:
 ${bullets}
+
 Return JSON { "items": [ { "source": "<content>", "splittable": true/false } ] }`
 }
 
 function usageJudgePrompt(glosses: Gloss[]) {
   const bullets = glosses.map((g) => `- ${g.content} (${g.language})`).join('\n')
-  return `Decide if each gloss is suitable for generating usage examples. Answer yes/no.
-Criteria: expressions or parts that appear in sentences; skip function words.
-Items:
+  return `You judge whether glosses are suitable for usage examples.
+
+Words and short phrases can usefully be demonstrated in example sentences.
+Complete sentences or long expressions cannot - they ARE the examples.
+
+For each gloss below, return true if it's a word/short phrase that can be used in an example sentence, false otherwise.
+
+Glosses:
 ${bullets}
+
 Return JSON { "items": [ { "source": "<content>", "ok": true/false } ] }`
 }
 
@@ -124,11 +174,20 @@ async function runCompletion(
   for (const item of items) {
     const source = String(item.source || '').trim()
     if (!source) continue
-    const vals =
-      (item.translations || item.parts || item.usages || []).filter(
-        (v: unknown) => typeof v === 'string' && v.trim()
-      ) || []
-    map.set(source, vals.map((v: string) => v.trim()))
+    const raw =
+      item.translations ||
+      item.parts ||
+      item.usages ||
+      []
+    const vals: string[] = []
+    for (const v of raw || []) {
+      if (typeof v === 'string' && v.trim()) {
+        vals.push(v.trim())
+      } else if (v && typeof v === 'object' && typeof v.text === 'string' && v.text.trim()) {
+        vals.push(v.text.trim())
+      }
+    }
+    map.set(source, vals)
   }
   return map as Record<string, string[]>
 }
@@ -136,13 +195,21 @@ async function runCompletion(
 async function runJudge(apiKey: string, prompt: string): Promise<Set<string>> {
   const content = (await runJsonAgent(apiKey, prompt, TEMP_JUDGE)) || '{}'
   const parsed = JSON.parse(content)
-  const items = parsed.items || []
+  const items = parsed.items || parsed || []
   const okSet = new Set<string>()
-  for (const item of items) {
-    const source = String(item.source || '').trim()
-    const decision = item.splittable === true || item.ok === true
-    if (source && decision) {
-      okSet.add(source)
+  if (Array.isArray(items)) {
+    for (const item of items) {
+      const source = String(item.source || '').trim()
+      const decision = item.splittable === true || item.ok === true
+      if (source && decision) {
+        okSet.add(source)
+      }
+    }
+  } else if (items && typeof items === 'object') {
+    for (const [source, decision] of Object.entries(items)) {
+      if (decision === true) {
+        okSet.add(source)
+      }
     }
   }
   return okSet
@@ -173,7 +240,11 @@ export async function generateTranslations(
   if (!refs.length) return []
   const glosses = await fetchGlosses(refs.slice(0, 25))
   if (!glosses.length) return []
-  const prompt = translationPrompt(mode, glosses, native, target, options)
+  const note =
+    mode === 'toNative'
+      ? await getAiNote(native)
+      : await getAiNote(target)
+  const prompt = translationPrompt(mode, glosses, native, target, note, options)
   const bag = await runCompletion(apiKey, prompt, TEMP_TRANSLATION)
   return mapSuggestions(glosses, bag)
 }
@@ -196,7 +267,8 @@ export async function generateParts(
   }
   const filtered = glosses.filter((g) => judgeOk.has(g.content))
   if (!filtered.length) return []
-  const prompt = partsPrompt(filtered, options)
+  const aiNote = await getAiNote(filtered[0].language)
+  const prompt = partsPrompt(filtered, aiNote, options)
   const bag = await runCompletion(apiKey, prompt, TEMP_GENERATION)
   return mapSuggestions(filtered, bag)
 }
@@ -219,7 +291,8 @@ export async function generateUsage(
   }
   const filtered = glosses.filter((g) => judgeOk.has(g.content))
   if (!filtered.length) return []
-  const prompt = usagePrompt(filtered, options)
+  const aiNote = await getAiNote(filtered[0].language)
+  const prompt = usagePrompt(filtered, aiNote, options)
   const bag = await runCompletion(apiKey, prompt, TEMP_GENERATION)
   return mapSuggestions(filtered, bag)
 }

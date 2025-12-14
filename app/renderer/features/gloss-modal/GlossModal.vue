@@ -329,6 +329,7 @@ import type { RelationshipField } from '../../entities/glosses/relationRules'
 import { generateTranslations, generateParts as aiPartsGen, generateUsage as aiUsageGen } from '../ai-batch-tools/useAiGeneration'
 import { useSettings } from '../../entities/system/settingsStore'
 import GoalConfirmModal from '../goal-confirm-modal/GoalConfirmModal.vue'
+import { paraphraseDisplay } from '../../entities/glosses/goalState'
 
 const props = defineProps<{
   open: boolean
@@ -371,6 +372,7 @@ const transcriptions = ref<Record<string, string>>({})
 const transcriptionKeys = ref<Record<string, string>>({})
 const newTranscriptionKey = ref('')
 const newTranscriptionVal = ref('')
+const displayCache = ref(new Map<string, string>())
 
 const hasTranslations = computed(() => (gloss.value?.translations?.length || 0) > 0)
 const hasParts = computed(() => (gloss.value?.parts?.length || 0) > 0)
@@ -406,9 +408,9 @@ const otherLanguage = computed(() => {
 })
 
 function renderRef(refStr: string): string {
-  const [lang, ...rest] = refStr.split(':')
-  const slug = rest.join(':')
-  return `${lang}:${slug}`
+  const cached = displayCache.value.get(refStr)
+  if (cached) return cached
+  return refStr
 }
 
 async function loadGloss() {
@@ -426,11 +428,33 @@ async function loadGloss() {
     transcriptionKeys.value = Object.fromEntries(
       Object.keys(transcriptions.value).map((k) => [k, k])
     )
+    await hydrateDisplayCache(data)
   } catch (err) {
     console.error(err)
     error('Failed to load gloss')
   } finally {
     loading.value = false
+  }
+}
+
+async function hydrateDisplayCache(current: Gloss) {
+  const refs = new Set<string>([
+    ...(current.translations || []),
+    ...(current.parts || []),
+    ...(current.usage_examples || []),
+    ...(current.children || []),
+    ...(current.notes || [])
+  ])
+
+  // Always include self
+  refs.add(`${current.language}:${current.slug}`)
+
+  for (const ref of refs) {
+    if (displayCache.value.has(ref)) continue
+    const g = await window.electronAPI.gloss.resolveRef(ref)
+    if (g) {
+      displayCache.value.set(ref, paraphraseDisplay(g))
+    }
   }
 }
 
@@ -468,6 +492,7 @@ async function handleContentBlur() {
       newContent
     )
     success('Content updated')
+    await loadGloss()
     emit('saved')
   } catch (err) {
     console.error(err)

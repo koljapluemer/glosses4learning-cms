@@ -76,13 +76,31 @@ export function setupGlossHandlers() {
     gloss.content = newContent
 
     // This will create a new file with the new slug if content changed
-    storage.createGloss(gloss)
+    const updated = storage.createGloss(gloss)
 
-    // Delete old file if slug changed
-    const parts = oldRef.split(':')
-    const oldSlug = parts.slice(1).join(':')
-    if (oldSlug !== gloss.slug) {
-      storage.deleteGloss(gloss.language, oldSlug)
+    // If slug changed, rewrite references across all glosses before deleting old file
+    const oldSlug = oldRef.split(':').slice(1).join(':')
+    const newSlug = updated.slug
+    const newRef = `${updated.language}:${newSlug}`
+
+    if (oldSlug !== newSlug) {
+      const oldRefCanonical = `${updated.language}:${oldSlug}`
+      for (const item of storage.iterateAllGlosses()) {
+        let changed = false
+        const record = item as Record<string, string[]>
+        for (const field of RELATIONSHIP_FIELDS) {
+          const vals = record[field] || []
+          const replaced = vals.map((v: string) => (v === oldRefCanonical ? newRef : v))
+          if (replaced.some((v, idx) => v !== vals[idx])) {
+            record[field] = replaced
+            changed = true
+          }
+        }
+        if (changed) {
+          storage.saveGloss(item)
+        }
+      }
+      storage.deleteGloss(updated.language, oldSlug)
     }
   })
 

@@ -8,6 +8,10 @@ import { OpenAIChatCompletionsModel, setDefaultOpenAIKey } from '@openai/agents-
 
 const MODEL_NAME = 'gpt-4o-mini'
 const TEMPERATURE_CREATIVE = 0.7
+const SYSTEM_UNDERSTANDING =
+  'You create expressions in the target language that a learner needs to understand in various situations.'
+const SYSTEM_PROCEDURAL =
+  'You create practical expression goals a learner wants to express in the native language.'
 
 interface GeneratedGoals {
   goals: string[]
@@ -44,7 +48,9 @@ export async function generateUnderstandingGoals(
   extraContext: string = ''
 ): Promise<GeneratedGoals> {
   const contextText = extraContext ? `Additional context: ${extraContext}` : ''
-  const userPrompt = `Generate ${numGoals} expressions in ${targetLanguage} for the situation: "${situationContent}".
+  const userPrompt = `${SYSTEM_UNDERSTANDING}
+
+Generate ${numGoals} expressions in ${targetLanguage} for the situation: "${situationContent}".
 
 These are things a learner might HEAR or encounter in ${targetLanguage} and need to UNDERSTAND.
 
@@ -84,7 +90,9 @@ export async function generateProceduralGoals(
   extraContext: string = ''
 ): Promise<GeneratedGoals> {
   const contextText = extraContext ? `Additional context: ${extraContext}` : ''
-  const userPrompt = `Generate ${numGoals} paraphrased expressions in ${nativeLanguage} for the situation: "${situationContent}".
+  const userPrompt = `${SYSTEM_PROCEDURAL}
+
+Generate ${numGoals} paraphrased expressions in ${nativeLanguage} for the situation: "${situationContent}".
 
 These are procedural descriptions in the learner's native language of things they might want to express in ${targetLanguage}.
 
