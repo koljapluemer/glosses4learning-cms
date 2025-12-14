@@ -42,6 +42,7 @@ export type ElectronAPI = {
       noteLanguage: string
     ) => Promise<Gloss>
     markLog: (glossRef: string, marker: string) => Promise<void>
+    noteUsageCount: (noteRef: string) => Promise<{ count: number; parents: string[] }>
     evaluateGoalState: (
       glossRef: string,
       nativeLanguage: string,
@@ -94,6 +95,7 @@ const api: ElectronAPI = {
         noteLanguage
       ),
     markLog: (glossRef, marker) => ipcRenderer.invoke('gloss:markLog', glossRef, marker),
+    noteUsageCount: (noteRef) => ipcRenderer.invoke('gloss:noteUsageCount', noteRef),
     evaluateGoalState: (glossRef, nativeLanguage, targetLanguage) =>
       ipcRenderer.invoke('gloss:evaluateGoalState', glossRef, nativeLanguage, targetLanguage)
   },

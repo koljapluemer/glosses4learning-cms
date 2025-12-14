@@ -32,13 +32,13 @@
                 <button class="btn btn-ghost btn-xs" @click="$emit('select-goal', goal.id)" title="Open tab">
                   <ExternalLink class="w-4 h-4" />
                 </button>
-                <button class="btn btn-ghost btn-xs" title="Disattach">
+                <button class="btn btn-ghost btn-xs" title="Disattach" @click="$emit('detach-goal', goal.id)">
                   <Unlink class="w-4 h-4" />
                 </button>
-                <button class="btn btn-ghost btn-xs text-error" title="Delete">
+                <button class="btn btn-ghost btn-xs text-error" title="Delete" @click="$emit('delete-goal', goal.id)">
                   <Trash2 class="w-4 h-4" />
                 </button>
-                <button class="btn btn-ghost btn-xs" title="Edit">
+                <button class="btn btn-ghost btn-xs" title="Edit" @click="$emit('edit-goal', goal.id)">
                   <Edit class="w-4 h-4" />
                 </button>
               </div>
@@ -74,21 +74,21 @@
     </div>
 
     <!-- AI Tools -->
-    <div class="flex gap-2">
-      <button class="btn btn-sm" :disabled="aiGenerating" @click="generateUnderstandingGoals">
-        Add Understand Goals
-      </button>
-      <button class="btn btn-sm" :disabled="aiGenerating" @click="generateProceduralGoals">
-        Add Procedural Goals
-      </button>
-    </div>
+      <div class="flex gap-2">
+        <button class="btn btn-sm" :disabled="aiGenerating" @click="generateUnderstandingGoals">
+          Add Understand Goals
+        </button>
+        <button class="btn btn-sm" :disabled="aiGenerating" @click="generateProceduralGoals">
+          Add Procedural Goals
+        </button>
+      </div>
 
     <!-- Goal Confirmation Modal -->
-    <GoalConfirmModal
-      :open="showGoalModal"
-      :title="modalTitle"
-      :message="modalMessage"
-      :goals="generatedGoals"
+<GoalConfirmModal
+  :open="showGoalModal"
+  :title="modalTitle"
+  :message="modalMessage"
+  :goals="generatedGoals"
       :loading="aiGenerating"
       :error="aiError"
       @close="closeGoalModal"
@@ -129,6 +129,9 @@ const emit = defineEmits<{
   'add-goal': []
   'select-goal': [goalId: string]
   'reload-goals': []
+  'detach-goal': [goalId: string]
+  'delete-goal': [goalId: string]
+  'edit-goal': [goalId: string]
 }>()
 
 const { success, error } = useToasts()

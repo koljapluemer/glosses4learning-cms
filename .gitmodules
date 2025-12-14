@@ -1,6 +1,6 @@
 [submodule "data"]
 	path = data
-	url = git@github.com:koljapluemer/glosses4learning.git
+	url = git@github.com:koljapluemer/sbll-data.git
 [submodule "situations"]
 	path = situations
 	url = https://github.com/koljapluemer/sbll-data

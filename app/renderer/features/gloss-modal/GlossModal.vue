@@ -1,0 +1,843 @@
+<template>
+  <ModalShell :open="open" title="Edit Gloss" size="xl" @close="$emit('close')">
+    <div v-if="loading" class="py-8 flex justify-center">
+      <span class="loading loading-spinner loading-lg"></span>
+    </div>
+
+    <div v-else-if="!gloss" class="alert alert-error">Gloss not found.</div>
+
+    <div v-else class="space-y-6">
+      <!-- Core info -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <fieldset class="fieldset md:col-span-2">
+          <label class="label">Content ({{ gloss.language.toUpperCase() }})</label>
+          <input
+            v-model="contentDraft"
+            type="text"
+            class="input input-bordered w-full"
+            @blur="handleContentBlur"
+          />
+        </fieldset>
+        <div class="flex items-end gap-3">
+          <button class="btn btn-outline btn-sm" @click="toggleNeedsCheck">
+            {{ gloss.needsHumanCheck ? 'Unset needs check' : 'Mark needs check' }}
+          </button>
+          <button class="btn btn-outline btn-sm" @click="toggleExclude">
+            {{ gloss.excludeFromLearning ? 'Include in learning' : 'Exclude from learning' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Translations -->
+      <section>
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-3">
+            <h3 class="font-semibold">Translations</h3>
+            <span v-if="translationBlocked" class="badge badge-warning badge-outline text-xs">
+              marked impossible
+            </span>
+          </div>
+          <div class="flex gap-2">
+            <input
+              v-model="translationDraft"
+              type="text"
+              class="input input-bordered input-sm w-64"
+              :placeholder="`Add translation (${otherLanguage?.toUpperCase() || 'lang'})`"
+              list="translation-suggestions"
+              @keyup.enter="addTranslation"
+            />
+            <datalist id="translation-suggestions">
+              <option v-for="s in translationSuggestions" :key="s.slug" :value="s.content" />
+            </datalist>
+            <button class="btn btn-sm" :disabled="!translationDraft.trim()" @click="addTranslation">
+              Add
+            </button>
+            <button
+              class="btn btn-outline btn-sm"
+              v-if="!hasTranslations"
+              :disabled="translationBlocked"
+              @click="markTranslationImpossible"
+            >
+              Mark impossible
+            </button>
+            <button
+              class="btn btn-sm"
+              :disabled="aiTranslating || translationBlocked"
+              @click="generateTranslations"
+            >
+              AI add
+            </button>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="ref in gloss.translations || []"
+            :key="ref"
+            class="badge badge-outline gap-2"
+          >
+            {{ renderRef(ref) }}
+            <button class="btn btn-ghost btn-xs" @click="detach('translations', ref)">
+              <X class="w-4 h-4" />
+            </button>
+          </span>
+        </div>
+      </section>
+
+      <!-- Parts -->
+      <section>
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-3">
+            <h3 class="font-semibold">Parts</h3>
+            <span v-if="partsBlocked" class="badge badge-warning badge-outline text-xs">
+              marked unsplittable
+            </span>
+          </div>
+          <div class="flex gap-2">
+            <input
+              v-model="partDraft"
+              type="text"
+              class="input input-bordered input-sm w-64"
+              :placeholder="`Add part (${gloss.language.toUpperCase()})`"
+              list="part-suggestions"
+              @keyup.enter="addPart"
+            />
+            <datalist id="part-suggestions">
+              <option v-for="s in partSuggestions" :key="s.slug" :value="s.content" />
+            </datalist>
+            <button class="btn btn-sm" :disabled="!partDraft.trim()" @click="addPart">
+              Add
+            </button>
+            <button
+              class="btn btn-outline btn-sm"
+              :disabled="partsBlocked || hasParts"
+              @click="markUnsplittable"
+            >
+              Mark unsplittable
+            </button>
+            <button
+              class="btn btn-sm"
+              :disabled="aiParts || partsBlocked"
+              @click="generateParts"
+            >
+              AI add
+            </button>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span v-for="ref in gloss.parts || []" :key="ref" class="badge badge-outline gap-2">
+            {{ renderRef(ref) }}
+            <button class="btn btn-ghost btn-xs" @click="detach('parts', ref)">
+              <X class="w-4 h-4" />
+            </button>
+          </span>
+        </div>
+      </section>
+
+      <!-- Usage examples -->
+      <section>
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-3">
+            <h3 class="font-semibold">Usage Examples</h3>
+            <span v-if="usageBlocked" class="badge badge-warning badge-outline text-xs">
+              marked impossible
+            </span>
+          </div>
+          <div class="flex gap-2">
+            <input
+              v-model="usageDraft"
+              type="text"
+              class="input input-bordered input-sm w-64"
+              placeholder="Add usage example"
+              list="usage-suggestions"
+              @keyup.enter="addUsage"
+            />
+            <datalist id="usage-suggestions">
+              <option v-for="s in usageSuggestions" :key="s.slug" :value="s.content" />
+            </datalist>
+            <button class="btn btn-sm" :disabled="!usageDraft.trim()" @click="addUsage">
+              Add
+            </button>
+            <button
+              class="btn btn-outline btn-sm"
+              :disabled="usageBlocked || hasUsage"
+              @click="markUsageImpossible"
+            >
+              Mark impossible
+            </button>
+            <button
+              class="btn btn-sm"
+              :disabled="aiUsage || usageBlocked"
+              @click="generateUsage"
+            >
+              AI add
+            </button>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="ref in gloss.usage_examples || []"
+            :key="ref"
+            class="badge badge-outline gap-2"
+          >
+            {{ renderRef(ref) }}
+            <button class="btn btn-ghost btn-xs" @click="detach('usage_examples', ref)">
+              <X class="w-4 h-4" />
+            </button>
+          </span>
+        </div>
+      </section>
+
+      <!-- Children -->
+      <section>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold">Children</h3>
+          <div class="flex gap-2">
+            <input
+              v-model="childDraft"
+              type="text"
+              class="input input-bordered input-sm w-64"
+              placeholder="Add child gloss"
+              list="child-suggestions"
+              @keyup.enter="addChild"
+            />
+            <datalist id="child-suggestions">
+              <option v-for="s in childSuggestions" :key="s.slug" :value="s.content" />
+            </datalist>
+            <button class="btn btn-sm" :disabled="!childDraft.trim()" @click="addChild">
+              Add
+            </button>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span v-for="ref in gloss.children || []" :key="ref" class="badge badge-outline gap-2">
+            {{ renderRef(ref) }}
+            <button class="btn btn-ghost btn-xs" @click="detach('children', ref)">
+              <X class="w-4 h-4" />
+            </button>
+          </span>
+        </div>
+      </section>
+
+      <!-- Notes -->
+      <section>
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-3">
+            <h3 class="font-semibold">Notes</h3>
+          </div>
+          <div class="flex gap-2 items-center">
+            <select v-model="noteLang" class="select select-bordered select-sm w-28">
+              <option :value="nativeLanguage">Native ({{ nativeLanguage.toUpperCase() }})</option>
+              <option :value="targetLanguage">Target ({{ targetLanguage.toUpperCase() }})</option>
+            </select>
+            <input
+              v-model="noteDraft"
+              type="text"
+              class="input input-bordered input-sm w-64"
+              placeholder="Add note"
+              @keyup.enter="addNote"
+            />
+            <button class="btn btn-sm" :disabled="!noteDraft.trim()" @click="addNote">
+              Add
+            </button>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span v-for="ref in gloss.notes || []" :key="ref" class="badge badge-outline gap-2">
+            {{ renderRef(ref) }}
+            <button class="btn btn-ghost btn-xs" title="Detach" @click="detach('notes', ref)">
+              <X class="w-4 h-4" />
+            </button>
+            <button class="btn btn-ghost btn-xs text-error" title="Delete note" @click="deleteNote(ref)">
+              <Trash2 class="w-4 h-4" />
+            </button>
+          </span>
+        </div>
+      </section>
+
+      <!-- Transcriptions -->
+      <section>
+        <h3 class="font-semibold mb-2">Transcriptions</h3>
+        <div class="space-y-2">
+          <div v-for="(val, key) in transcriptions" :key="key" class="flex gap-2">
+            <input v-model="transcriptionKeys[key]" class="input input-sm input-bordered w-32" />
+            <input v-model="transcriptions[key]" class="input input-sm input-bordered flex-1" />
+            <button class="btn btn-ghost btn-xs" @click="removeTranscription(key)">
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <input v-model="newTranscriptionKey" class="input input-sm input-bordered w-32" />
+            <input v-model="newTranscriptionVal" class="input input-sm input-bordered flex-1" />
+            <button
+              class="btn btn-sm"
+              :disabled="!newTranscriptionKey.trim() || !newTranscriptionVal.trim()"
+              @click="addTranscription"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Danger zone -->
+      <div class="flex justify-between items-center border-t pt-4">
+        <div class="text-sm text-base-content/70">
+          Deleting will remove this gloss and clean references.
+        </div>
+        <button class="btn btn-error" @click="deleteGloss">
+          Delete Gloss
+        </button>
+      </div>
+    </div>
+
+    <GoalConfirmModal
+      :open="aiModalOpen"
+      :title="aiModalTitle"
+      message="Select which suggestions to attach"
+      :goals="aiModalItems"
+      @close="aiModalOpen = false"
+      @confirm="applyAiSuggestions"
+    />
+  </ModalShell>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, watch, ref } from 'vue'
+import { X, Trash2 } from 'lucide-vue-next'
+import ModalShell from '../../dumb/ModalShell.vue'
+import { useToasts } from '../toast-center/useToasts'
+import type { Gloss } from '../../../main-process/storage/types'
+import type { RelationshipField } from '../../entities/glosses/relationRules'
+import { generateTranslations, generateParts as aiPartsGen, generateUsage as aiUsageGen } from '../ai-batch-tools/useAiGeneration'
+import { useSettings } from '../../entities/system/settingsStore'
+import GoalConfirmModal from '../goal-confirm-modal/GoalConfirmModal.vue'
+
+const props = defineProps<{
+  open: boolean
+  glossRef: string | null
+  nativeLanguage: string
+  targetLanguage: string
+}>()
+
+const emit = defineEmits<{
+  close: []
+  saved: []
+  deleted: [ref?: string]
+}>()
+
+const { success, error, info } = useToasts()
+const { settings } = useSettings()
+
+const loading = ref(false)
+const gloss = ref<Gloss | null>(null)
+const contentDraft = ref('')
+const translationDraft = ref('')
+const translationSuggestions = ref<Gloss[]>([])
+const partDraft = ref('')
+const partSuggestions = ref<Gloss[]>([])
+const usageDraft = ref('')
+const usageSuggestions = ref<Gloss[]>([])
+const childDraft = ref('')
+const childSuggestions = ref<Gloss[]>([])
+const noteDraft = ref('')
+const noteLang = ref(props.nativeLanguage)
+const aiModalOpen = ref(false)
+const aiModalTitle = ref('')
+const aiModalItems = ref<string[]>([])
+const aiModalKind = ref<'translations' | 'parts' | 'usage' | null>(null)
+
+const transcriptions = ref<Record<string, string>>({})
+const transcriptionKeys = ref<Record<string, string>>({})
+const newTranscriptionKey = ref('')
+const newTranscriptionVal = ref('')
+
+const hasTranslations = computed(() => (gloss.value?.translations?.length || 0) > 0)
+const hasParts = computed(() => (gloss.value?.parts?.length || 0) > 0)
+const hasUsage = computed(() => (gloss.value?.usage_examples?.length || 0) > 0)
+const aiTranslating = ref(false)
+const aiParts = ref(false)
+const aiUsage = ref(false)
+
+function logHas(marker: string): boolean {
+  const logs = gloss.value?.logs
+  if (!logs || typeof logs !== 'object') return false
+  return Object.values(logs).some((v) => String(v).includes(marker))
+}
+
+const translationBlocked = computed(() => {
+  if (!gloss.value) return false
+  const other =
+    gloss.value.language === props.nativeLanguage ? props.targetLanguage : props.nativeLanguage
+  return logHas(`TRANSLATION_CONSIDERED_IMPOSSIBLE:${other}`)
+})
+
+const partsBlocked = computed(() => logHas('SPLIT_CONSIDERED_UNNECESSARY'))
+
+const usageBlocked = computed(() =>
+  gloss.value ? logHas(`USAGE_EXAMPLE_CONSIDERED_IMPOSSIBLE:${gloss.value.language}`) : false
+)
+
+const otherLanguage = computed(() => {
+  if (!gloss.value) return null
+  if (gloss.value.language === props.nativeLanguage) return props.targetLanguage
+  if (gloss.value.language === props.targetLanguage) return props.nativeLanguage
+  return null
+})
+
+function renderRef(refStr: string): string {
+  const [lang, ...rest] = refStr.split(':')
+  const slug = rest.join(':')
+  return `${lang}:${slug}`
+}
+
+async function loadGloss() {
+  if (!props.glossRef) {
+    gloss.value = null
+    return
+  }
+
+  loading.value = true
+  try {
+    const data = await window.electronAPI.gloss.resolveRef(props.glossRef)
+    gloss.value = data
+    contentDraft.value = data?.content || ''
+    transcriptions.value = { ...(data?.transcriptions || {}) }
+    transcriptionKeys.value = Object.fromEntries(
+      Object.keys(transcriptions.value).map((k) => [k, k])
+    )
+  } catch (err) {
+    console.error(err)
+    error('Failed to load gloss')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleContentBlur() {
+  if (!gloss.value) return
+  const newContent = contentDraft.value.trim()
+  if (!newContent || newContent === gloss.value.content) return
+
+  try {
+    const usage = await window.electronAPI.gloss.checkReferences(
+      `${gloss.value.language}:${gloss.value.slug}`
+    )
+    const hasRefs =
+      (usage.usedAsPart?.length || 0) > 0 ||
+      (usage.usedAsUsageExample?.length || 0) > 0 ||
+      (usage.usedAsTranslation?.length || 0) > 0
+
+    if (hasRefs) {
+      const lines = [
+        `Change will affect references:`,
+        `Parts: ${usage.usedAsPart.join(', ') || 'none'}`,
+        `Usages: ${usage.usedAsUsageExample.join(', ') || 'none'}`,
+        `Translations: ${usage.usedAsTranslation.join(', ') || 'none'}`,
+        'Proceed?'
+      ]
+      const ok = confirm(lines.join('\n'))
+      if (!ok) {
+        contentDraft.value = gloss.value.content
+        return
+      }
+    }
+
+    await window.electronAPI.gloss.updateContent(
+      `${gloss.value.language}:${gloss.value.slug}`,
+      newContent
+    )
+    success('Content updated')
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to update content')
+  }
+}
+
+async function detach(field: RelationshipField, targetRef: string) {
+  if (!gloss.value) return
+  try {
+    await window.electronAPI.gloss.detachRelation(
+      `${gloss.value.language}:${gloss.value.slug}`,
+      field,
+      targetRef
+    )
+    success('Detached')
+    await loadGloss()
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to detach')
+  }
+}
+
+async function addTranslation() {
+  if (!gloss.value || !otherLanguage.value) return
+  const content = translationDraft.value.trim()
+  if (!content) return
+
+  try {
+    const newGloss = await window.electronAPI.gloss.ensure(otherLanguage.value, content)
+    const baseRef = `${gloss.value.language}:${gloss.value.slug}`
+    const targetRef = `${newGloss.language}:${newGloss.slug}`
+    await window.electronAPI.gloss.attachRelation(baseRef, 'translations', targetRef)
+    success('Translation added')
+    translationDraft.value = ''
+    await loadGloss()
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to add translation')
+  }
+}
+
+async function addPart() {
+  if (!gloss.value) return
+  const content = partDraft.value.trim()
+  if (!content) return
+
+  try {
+    const newGloss = await window.electronAPI.gloss.ensure(gloss.value.language, content)
+    const baseRef = `${gloss.value.language}:${gloss.value.slug}`
+    const targetRef = `${newGloss.language}:${newGloss.slug}`
+    await window.electronAPI.gloss.attachRelation(baseRef, 'parts', targetRef)
+    success('Part added')
+    partDraft.value = ''
+    await loadGloss()
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to add part')
+  }
+}
+
+async function addUsage() {
+  if (!gloss.value) return
+  const content = usageDraft.value.trim()
+  if (!content) return
+
+  try {
+    const newGloss = await window.electronAPI.gloss.ensure(gloss.value.language, content)
+    const baseRef = `${gloss.value.language}:${gloss.value.slug}`
+    const targetRef = `${newGloss.language}:${newGloss.slug}`
+    await window.electronAPI.gloss.attachRelation(baseRef, 'usage_examples', targetRef)
+    success('Usage added')
+    usageDraft.value = ''
+    await loadGloss()
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to add usage example')
+  }
+}
+
+async function generateTranslations() {
+  if (!gloss.value || !otherLanguage.value) return
+  const apiKey = settings.value.openaiApiKey
+  if (!apiKey) {
+    error('Set OpenAI API key in settings')
+    return
+  }
+  aiTranslating.value = true
+  try {
+    const res = await generateTranslations(
+      apiKey,
+      gloss.value.language === props.nativeLanguage ? 'toTarget' : 'toNative',
+      [`${gloss.value.language}:${gloss.value.slug}`],
+      props.nativeLanguage,
+      props.targetLanguage
+    )
+    aiModalKind.value = 'translations'
+    aiModalItems.value = res[0]?.suggestions || []
+    aiModalTitle.value = 'Confirm translations'
+    aiModalOpen.value = true
+  } catch (err) {
+    console.error(err)
+    error('AI translation failed')
+  } finally {
+    aiTranslating.value = false
+  }
+}
+
+async function generateParts() {
+  if (!gloss.value) return
+  const apiKey = settings.value.openaiApiKey
+  if (!apiKey) {
+    error('Set OpenAI API key in settings')
+    return
+  }
+  aiParts.value = true
+  try {
+    const res = await aiPartsGen(apiKey, [`${gloss.value.language}:${gloss.value.slug}`])
+    aiModalKind.value = 'parts'
+    aiModalItems.value = res[0]?.suggestions || []
+    aiModalTitle.value = 'Confirm parts'
+    aiModalOpen.value = true
+  } catch (err) {
+    console.error(err)
+    error('AI parts failed')
+  } finally {
+    aiParts.value = false
+  }
+}
+
+async function generateUsage() {
+  if (!gloss.value) return
+  const apiKey = settings.value.openaiApiKey
+  if (!apiKey) {
+    error('Set OpenAI API key in settings')
+    return
+  }
+  aiUsage.value = true
+  try {
+    const res = await aiUsageGen(apiKey, [`${gloss.value.language}:${gloss.value.slug}`])
+    aiModalKind.value = 'usage'
+    aiModalItems.value = res[0]?.suggestions || []
+    aiModalTitle.value = 'Confirm usage examples'
+    aiModalOpen.value = true
+  } catch (err) {
+    console.error(err)
+    error('AI usage failed')
+  } finally {
+    aiUsage.value = false
+  }
+}
+
+async function applyAiSuggestions(selected: string[]) {
+  if (!gloss.value || !aiModalKind.value) return
+  aiModalOpen.value = false
+  if (!selected.length) return
+  if (aiModalKind.value === 'translations' && otherLanguage.value) {
+    for (const text of selected) {
+      translationDraft.value = text
+      await addTranslation()
+    }
+  } else if (aiModalKind.value === 'parts') {
+    for (const text of selected) {
+      partDraft.value = text
+      await addPart()
+    }
+  } else if (aiModalKind.value === 'usage') {
+    for (const text of selected) {
+      usageDraft.value = text
+      await addUsage()
+    }
+  }
+}
+
+async function addChild() {
+  if (!gloss.value) return
+  const content = childDraft.value.trim()
+  if (!content) return
+  try {
+    const newGloss = await window.electronAPI.gloss.ensure(gloss.value.language, content)
+    const baseRef = `${gloss.value.language}:${gloss.value.slug}`
+    const targetRef = `${newGloss.language}:${newGloss.slug}`
+    await window.electronAPI.gloss.attachRelation(baseRef, 'children', targetRef)
+    success('Child added')
+    childDraft.value = ''
+    await loadGloss()
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to add child')
+  }
+}
+
+async function addNote() {
+  if (!gloss.value) return
+  const content = noteDraft.value.trim()
+  if (!content) return
+
+  try {
+    const noteGloss = await window.electronAPI.gloss.ensure(noteLang.value, content)
+    const baseRef = `${gloss.value.language}:${gloss.value.slug}`
+    const targetRef = `${noteGloss.language}:${noteGloss.slug}`
+    await window.electronAPI.gloss.attachRelation(baseRef, 'notes', targetRef)
+    success('Note added')
+    noteDraft.value = ''
+    await loadGloss()
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to add note')
+  }
+}
+
+async function deleteNote(noteRef: string) {
+  if (!gloss.value) return
+  try {
+    const usage = await window.electronAPI.gloss.noteUsageCount(noteRef)
+    if (usage.count > 1) {
+      await detach('notes', noteRef)
+      info(`Note used elsewhere; detached only (still referenced by ${usage.count - 1} other glosses)`)
+      return
+    }
+    const [lang, ...slugParts] = noteRef.split(':')
+    const slug = slugParts.join(':')
+    const ok = confirm(`Delete note ${noteRef}? This will clean references.`)
+    if (!ok) return
+    await window.electronAPI.gloss.deleteWithCleanup(lang, slug)
+    success('Note deleted')
+    await loadGloss()
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to delete note')
+  }
+}
+
+function removeTranscription(key: string) {
+  delete transcriptions.value[key]
+  delete transcriptionKeys.value[key]
+  persistTranscriptions()
+}
+
+function addTranscription() {
+  const k = newTranscriptionKey.value.trim()
+  const v = newTranscriptionVal.value.trim()
+  if (!k || !v) return
+  transcriptions.value[k] = v
+  transcriptionKeys.value[k] = k
+  newTranscriptionKey.value = ''
+  newTranscriptionVal.value = ''
+  persistTranscriptions()
+}
+
+function persistTranscriptions() {
+  if (!gloss.value) return
+  gloss.value.transcriptions = { ...transcriptions.value }
+  window.electronAPI.gloss.save(gloss.value).then(() => emit('saved'))
+}
+
+async function toggleExclude() {
+  if (!gloss.value) return
+  try {
+    gloss.value.excludeFromLearning = !gloss.value.excludeFromLearning
+    await window.electronAPI.gloss.save(gloss.value)
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to toggle flag')
+  }
+}
+
+async function toggleNeedsCheck() {
+  if (!gloss.value) return
+  try {
+    gloss.value.needsHumanCheck = !gloss.value.needsHumanCheck
+    await window.electronAPI.gloss.save(gloss.value)
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to toggle flag')
+  }
+}
+
+async function markTranslationImpossible() {
+  if (!gloss.value || translationBlocked.value) return
+  const other =
+    gloss.value.language === props.nativeLanguage ? props.targetLanguage : props.nativeLanguage
+  const marker = `TRANSLATION_CONSIDERED_IMPOSSIBLE:${other}`
+  await window.electronAPI.gloss.markLog(`${gloss.value.language}:${gloss.value.slug}`, marker)
+  success('Marked as untranslatable')
+  await loadGloss()
+  emit('saved')
+}
+
+async function markUnsplittable() {
+  if (!gloss.value || partsBlocked.value) return
+  const marker = 'SPLIT_CONSIDERED_UNNECESSARY'
+  await window.electronAPI.gloss.markLog(`${gloss.value.language}:${gloss.value.slug}`, marker)
+  success('Marked unsplittable')
+  await loadGloss()
+  emit('saved')
+}
+
+async function markUsageImpossible() {
+  if (!gloss.value || usageBlocked.value) return
+  const marker = `USAGE_EXAMPLE_CONSIDERED_IMPOSSIBLE:${gloss.value.language}`
+  await window.electronAPI.gloss.markLog(`${gloss.value.language}:${gloss.value.slug}`, marker)
+  success('Marked usage impossible')
+  await loadGloss()
+  emit('saved')
+}
+
+async function deleteGloss() {
+  if (!gloss.value) return
+  const ref = `${gloss.value.language}:${gloss.value.slug}`
+  const ok = confirm(`Delete ${ref}? This will clean references.`)
+  if (!ok) return
+  try {
+    await window.electronAPI.gloss.deleteWithCleanup(gloss.value.language, gloss.value.slug!)
+    success('Deleted')
+    emit('deleted', ref)
+  } catch (err) {
+    console.error(err)
+    error('Delete failed')
+  }
+}
+
+async function fetchSuggestions(
+  language: string,
+  query: string,
+  setter: (items: Gloss[]) => void
+) {
+  if (!language) return
+  if (!query.trim()) {
+    setter([])
+    return
+  }
+  try {
+    const res = await window.electronAPI.gloss.searchByContent(language, query.trim(), 10)
+    setter(res)
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+watch(
+  () => translationDraft.value,
+  (q) => {
+    if (otherLanguage.value) {
+      fetchSuggestions(otherLanguage.value, q, (items) => (translationSuggestions.value = items))
+    }
+  }
+)
+
+watch(
+  () => partDraft.value,
+  (q) => fetchSuggestions(gloss.value?.language || '', q, (items) => (partSuggestions.value = items))
+)
+
+watch(
+  () => usageDraft.value,
+  (q) => fetchSuggestions(gloss.value?.language || '', q, (items) => (usageSuggestions.value = items))
+)
+
+watch(
+  () => childDraft.value,
+  (q) => fetchSuggestions(gloss.value?.language || '', q, (items) => (childSuggestions.value = items))
+)
+
+watch(
+  () => props.open,
+  async (isOpen) => {
+    if (isOpen) {
+      await loadGloss()
+    } else {
+      translationDraft.value = ''
+      partDraft.value = ''
+      usageDraft.value = ''
+      childDraft.value = ''
+      noteDraft.value = ''
+    }
+  }
+)
+
+onMounted(() => {
+  if (props.open) {
+    loadGloss()
+  }
+})
+</script>

@@ -1,5 +1,6 @@
 <template>
   <div class="h-screen flex flex-col">
+    <h1 class="sr-only">Situation Workspace</h1>
     <!-- Header with situation selector button -->
     <div class="navbar bg-base-200 shadow-sm">
       <div class="flex-1 gap-2">
@@ -82,6 +83,9 @@
             @add-goal="addGoal"
             @select-goal="selectGoal"
             @reload-goals="reloadGoals"
+            @detach-goal="detachGoal"
+            @delete-goal="deleteGoal"
+            @edit-goal="openGloss"
           />
 
           <!-- Goal Tabs -->
@@ -114,6 +118,29 @@
               @toggle-exclude="toggleExclude"
               @detach="detachRelation"
             />
+
+            <AiBatchToolPanel
+              v-if="activeGoalRef"
+              :goal-ref="activeGoalRef"
+              :goal-kind="activeGoalKind"
+              :native-language="nativeLang"
+              :target-language="targetLang"
+              :missing-native-refs="goalStats.missingNative"
+              :missing-target-refs="goalStats.missingTarget"
+              :missing-parts-refs="goalStats.missingParts"
+              :missing-usage-refs="goalStats.missingUsage"
+              @applied="handleGlossSaved"
+            />
+
+            <GlossModal
+              :open="glossModalOpen"
+              :gloss-ref="activeGlossRef"
+              :native-language="nativeLang"
+              :target-language="targetLang"
+              @close="glossModalOpen = false"
+              @saved="handleGlossSaved"
+              @deleted="handleGlossDeleted"
+            />
           </div>
         </template>
       </div>
@@ -129,11 +156,13 @@ import OverviewTab from './OverviewTab.vue'
 import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
 import SettingsModal from '../../features/settings-modal/SettingsModal.vue'
 import GlossTreePanel from '../../features/gloss-tree-panel/GlossTreePanel.vue'
+import GlossModal from '../../features/gloss-modal/GlossModal.vue'
+import AiBatchToolPanel from '../../features/ai-batch-tools/AiBatchToolPanel.vue'
 import { useToasts } from '../../features/toast-center/useToasts'
 import { getLanguageSymbol, loadLanguages } from '../../entities/languages/loader'
 import { useSettings } from '../../entities/system/settingsStore'
 import type { Language } from '../../entities/languages/types'
-import { buildGoalNodes, type TreeNode } from '../../entities/glosses/treeBuilder'
+import { buildGoalNodes, type TreeNode, type TreeStats } from '../../entities/glosses/treeBuilder'
 import type { Gloss } from '../../../main-process/storage/types'
 import type { GlossStorage } from '../../../main-process/storage/fsGlossStorage'
 
@@ -158,6 +187,9 @@ const showSituationPicker = ref(false)
 const showSettings = ref(false)
 const languages = ref<Language[]>([])
 const treeNodes = ref<TreeNode[]>([])
+const treeStats = ref<TreeStats | null>(null)
+const glossModalOpen = ref(false)
+const activeGlossRef = ref<string | null>(null)
 
 // Extract language params from route
 const nativeLang = computed(() => route.params.nativeLang as string)
@@ -180,6 +212,11 @@ const activeGoalTitle = computed(() => {
   return goals.value.find((g) => g.id === activeTab.value)?.title || ''
 })
 
+const activeGoalKind = computed(() => {
+  if (activeTab.value === 'overview') return null
+  return goals.value.find((g) => g.id === activeTab.value)?.type || null
+})
+
 const activeGoalState = computed(() => {
   if (activeTab.value === 'overview') return ''
   return goals.value.find((g) => g.id === activeTab.value)?.state || ''
@@ -190,6 +227,34 @@ const goalNodes = computed(() => {
   return treeNodes.value.filter(
     (node) => `${node.gloss.language}:${node.gloss.slug}` === activeTab.value
   )
+})
+
+const activeGoalRef = computed(() => {
+  if (activeTab.value === 'overview') return null
+  return activeTab.value
+})
+
+const goalStats = computed(() => {
+  const stats = treeStats.value
+  if (!stats || activeTab.value === 'overview') {
+    return {
+      missingNative: [] as string[],
+      missingTarget: [] as string[],
+      missingParts: [] as string[],
+      missingUsage: [] as string[]
+    }
+  }
+  const goalRootRef = activeTab.value
+  const includeDesc = new Set<string>()
+  goalNodes.value.forEach((n) => includeDesc.add(`${n.gloss.language}:${n.gloss.slug}`))
+  const filterSet = (input: Set<string>) =>
+    Array.from(input).filter((ref) => includeDesc.has(ref) || ref === goalRootRef)
+  return {
+    missingNative: filterSet(stats.native_missing),
+    missingTarget: filterSet(stats.target_missing),
+    missingParts: filterSet(stats.parts_missing),
+    missingUsage: filterSet(stats.usage_missing)
+  }
 })
 
 async function loadSituation() {
@@ -232,6 +297,42 @@ function addGoal() {
 
 function selectGoal(goalId: string) {
   activeTab.value = goalId
+  // Open gloss modal when selecting from overview edit
+  if (goalId && goalId !== 'overview') {
+    activeGlossRef.value = goalId
+  }
+}
+
+async function detachGoal(goalId: string) {
+  if (!situation.value) return
+  const parentRef = `${situation.value.language}:${situation.value.slug}`
+  try {
+    await window.electronAPI.gloss.detachRelation(parentRef, 'children', goalId)
+    success('Goal detached')
+    await refreshTree(situation.value)
+  } catch (err) {
+    console.error(err)
+    error('Failed to detach goal')
+  }
+}
+
+async function deleteGoal(goalId: string) {
+  const [language, ...slugParts] = goalId.split(':')
+  const slug = slugParts.join(':')
+  if (!language || !slug) return
+
+  const ok = confirm(`Delete goal ${goalId}? This cleans references.`)
+  if (!ok) return
+  try {
+    await window.electronAPI.gloss.deleteWithCleanup(language, slug)
+    success('Goal deleted')
+    if (situation.value) {
+      await refreshTree(situation.value)
+    }
+  } catch (err) {
+    console.error(err)
+    error('Failed to delete goal')
+  }
 }
 
 async function reloadGoals() {
@@ -332,7 +433,7 @@ async function refreshTree(currentSituation: Gloss) {
       }
     }
 
-    const { nodes } = buildGoalNodes(
+    const { nodes, stats } = buildGoalNodes(
       currentSituation,
       storage as GlossStorage,
       nativeLang.value,
@@ -340,6 +441,7 @@ async function refreshTree(currentSituation: Gloss) {
     )
 
     treeNodes.value = nodes
+    treeStats.value = stats
     goals.value = mapGoalsFromNodes(nodes)
 
     // Ensure the active tab still exists
@@ -358,8 +460,8 @@ async function refreshTree(currentSituation: Gloss) {
 }
 
 async function openGloss(ref: string) {
-  // Placeholder until GlossModal is wired
-  console.log('Open gloss modal for', ref)
+  activeGlossRef.value = ref
+  glossModalOpen.value = true
 }
 
 async function deleteGloss(ref: string) {
@@ -396,12 +498,56 @@ async function toggleExclude(ref: string) {
 }
 
 async function detachRelation(parentRef: string, field: string, childRef: string) {
-  if (!parentRef || !field || !childRef) {
+  let relField = field
+  let relParent = parentRef || ''
+
+  function findParent(ref: string, nodes: TreeNode[]): { parent?: string; via?: string } | null {
+    for (const node of nodes) {
+      for (const child of node.children) {
+        const childId = `${child.gloss.language}:${child.gloss.slug}`
+        if (childId === ref) {
+          return { parent: node.parentRef || `${node.gloss.language}:${node.gloss.slug}`, via: child.viaField }
+        }
+        const deep = findParent(ref, child.children)
+        if (deep) return deep
+      }
+    }
+    return null
+  }
+
+  if (!relParent) {
+    const found = findParent(childRef, treeNodes.value)
+    if (found?.parent) {
+      relParent = found.parent
+      if (!relField && found.via) relField = found.via
+    }
+  }
+
+  if (!relParent || !childRef) {
     error('Cannot detach: missing relation context')
     return
   }
+
+  // Heuristic: if field empty, find which relation includes child
+  if (!relField) {
+    const parent = await window.electronAPI.gloss.resolveRef(relParent)
+    if (!parent) {
+      error('Parent not found')
+      return
+    }
+    const relations: Record<string, string[]> = parent as unknown as Record<string, string[]>
+    const matchField = Object.keys(relations).find((key) => {
+      const val = relations[key]
+      return Array.isArray(val) && val.includes(childRef)
+    })
+    if (!matchField) {
+      error('Relation not found on parent')
+      return
+    }
+    relField = matchField
+  }
   try {
-    await window.electronAPI.gloss.detachRelation(parentRef, field, childRef)
+    await window.electronAPI.gloss.detachRelation(relParent, relField, childRef)
     success('Detached relation')
     if (situation.value) {
       await refreshTree(situation.value)
@@ -410,6 +556,26 @@ async function detachRelation(parentRef: string, field: string, childRef: string
     console.error('Failed to detach relation', err)
     error('Detach failed')
   }
+}
+
+async function handleGlossSaved() {
+  if (situation.value) {
+    await refreshTree(situation.value)
+  }
+}
+
+async function handleGlossDeleted(ref?: string) {
+  if (ref && situation.value) {
+    const situationRef = `${situation.value.language}:${situation.value.slug}`
+    if (ref === situationRef) {
+      router.push('/')
+      return
+    }
+  }
+  if (situation.value) {
+    await refreshTree(situation.value)
+  }
+  glossModalOpen.value = false
 }
 
 // Watch for route changes to reload situation

@@ -174,6 +174,19 @@ export function setupGlossHandlers() {
     markGlossLog(storage, glossRef, marker)
   })
 
+  ipcMain.handle('gloss:noteUsageCount', async (_, noteRef: string) => {
+    let count = 0
+    const parents: string[] = []
+    for (const gloss of storage.iterateAllGlosses()) {
+      const notes = gloss.notes || []
+      if (notes.includes(noteRef)) {
+        count += 1
+        parents.push(`${gloss.language}:${gloss.slug}`)
+      }
+    }
+    return { count, parents }
+  })
+
   ipcMain.handle(
     'gloss:evaluateGoalState',
     async (_, glossRef: string, nativeLanguage: string, targetLanguage: string) => {

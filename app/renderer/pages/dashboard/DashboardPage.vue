@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { FolderOpen, Download } from 'lucide-vue-next'
 import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
@@ -85,4 +85,24 @@ function openSituation(situation: Situation) {
     }
   })
 }
+
+onMounted(async () => {
+  // Auto-open last situation if available and languages set
+  const { nativeLanguage, targetLanguage, lastSituationRef } = settings.value
+  if (nativeLanguage && targetLanguage && lastSituationRef) {
+    const [lang, ...slugParts] = lastSituationRef.split(':')
+    const slug = slugParts.join(':')
+    if (lang && slug) {
+      router.push({
+        name: 'situation-workspace',
+        params: {
+          situationLang: lang,
+          situationSlug: slug,
+          nativeLang: nativeLanguage,
+          targetLang: targetLanguage
+        }
+      })
+    }
+  }
+})
 </script>

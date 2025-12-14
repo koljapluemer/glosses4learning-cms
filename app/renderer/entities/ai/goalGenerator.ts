@@ -6,7 +6,7 @@
 import OpenAI from 'openai'
 
 const MODEL_NAME = 'gpt-4o-mini'
-const TEMPERATURE = 0.7 // TEMPERATURE_CREATIVE
+const TEMPERATURE_CREATIVE = 0.7
 
 interface GeneratedGoals {
   goals: string[]
@@ -54,7 +54,7 @@ Return JSON with a 'goals' array of strings.`
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ],
-    temperature: TEMPERATURE,
+    temperature: TEMPERATURE_CREATIVE,
     max_tokens: 500,
     response_format: {
       type: 'json_schema',
@@ -123,7 +123,7 @@ Return JSON with a 'goals' array of strings.`
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ],
-    temperature: TEMPERATURE,
+    temperature: TEMPERATURE_CREATIVE,
     max_tokens: 500,
     response_format: {
       type: 'json_schema',
