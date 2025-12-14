@@ -11,12 +11,14 @@ export interface AppSettings {
   nativeLanguage: string | null  // ISO code for learner's native language
   targetLanguage: string | null  // ISO code for language being learned
   lastSituationRef: string | null // Format: "language:slug"
+  openaiApiKey: string | null     // OpenAI API key for AI features
 }
 
 const settings: Ref<AppSettings> = ref({
   nativeLanguage: null,
   targetLanguage: null,
-  lastSituationRef: null
+  lastSituationRef: null,
+  openaiApiKey: null
 })
 
 let initialized = false
@@ -34,11 +36,13 @@ export async function initSettings(): Promise<void> {
     const native = await window.electronAPI.settings.get<string>('nativeLanguage')
     const target = await window.electronAPI.settings.get<string>('targetLanguage')
     const lastSit = await window.electronAPI.settings.get<string>('lastSituationRef')
+    const apiKey = await window.electronAPI.settings.get<string>('openaiApiKey')
 
     settings.value = {
       nativeLanguage: native || null,
       targetLanguage: target || null,
-      lastSituationRef: lastSit || null
+      lastSituationRef: lastSit || null,
+      openaiApiKey: apiKey || null
     }
 
     initialized = true
@@ -74,16 +78,24 @@ export function useSettings() {
       await window.electronAPI.settings.set('lastSituationRef', ref)
     },
 
+    /** Set the OpenAI API key */
+    async setOpenAIApiKey(key: string): Promise<void> {
+      settings.value.openaiApiKey = key
+      await window.electronAPI.settings.set('openaiApiKey', key)
+    },
+
     /** Clear all settings (useful for testing/reset) */
     async clearSettings(): Promise<void> {
       settings.value = {
         nativeLanguage: null,
         targetLanguage: null,
-        lastSituationRef: null
+        lastSituationRef: null,
+        openaiApiKey: null
       }
       await window.electronAPI.settings.set('nativeLanguage', null)
       await window.electronAPI.settings.set('targetLanguage', null)
       await window.electronAPI.settings.set('lastSituationRef', null)
+      await window.electronAPI.settings.set('openaiApiKey', null)
     }
   }
 }

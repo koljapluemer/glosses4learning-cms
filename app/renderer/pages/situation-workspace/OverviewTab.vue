@@ -75,9 +75,25 @@
 
     <!-- AI Tools -->
     <div class="flex gap-2">
-      <button class="btn btn-sm">Add Understand Goals</button>
-      <button class="btn btn-sm">Add Procedural Goals</button>
+      <button class="btn btn-sm" :disabled="aiGenerating" @click="generateUnderstandingGoals">
+        Add Understand Goals
+      </button>
+      <button class="btn btn-sm" :disabled="aiGenerating" @click="generateProceduralGoals">
+        Add Procedural Goals
+      </button>
     </div>
+
+    <!-- Goal Confirmation Modal -->
+    <GoalConfirmModal
+      :open="showGoalModal"
+      :title="modalTitle"
+      :message="modalMessage"
+      :goals="generatedGoals"
+      :loading="aiGenerating"
+      :error="aiError"
+      @close="closeGoalModal"
+      @confirm="confirmGoals"
+    />
   </div>
 </template>
 
@@ -85,6 +101,9 @@
 import { ref } from 'vue'
 import { ExternalLink, Unlink, Trash2, Edit } from 'lucide-vue-next'
 import { useToasts } from '../../features/toast-center/useToasts'
+import { useSettings } from '../../entities/system/settingsStore'
+import { generateUnderstandingGoals as aiGenerateUnderstanding, generateProceduralGoals as aiGenerateProcedural } from '../../entities/ai/goalGenerator'
+import GoalConfirmModal from '../../features/goal-confirm-modal/GoalConfirmModal.vue'
 
 interface Situation {
   slug: string
@@ -113,8 +132,19 @@ const emit = defineEmits<{
 }>()
 
 const { success, error } = useToasts()
+const { settings } = useSettings()
+
 const proceduralInput = ref('')
 const understandingInput = ref('')
+
+// AI goal generation state
+const showGoalModal = ref(false)
+const modalTitle = ref('')
+const modalMessage = ref('')
+const generatedGoals = ref<string[]>([])
+const aiGenerating = ref(false)
+const aiError = ref<string | null>(null)
+const pendingGoalType = ref<'procedural' | 'understanding' | null>(null)
 
 /**
  * Add a procedural goal (native language paraphrase expression)
@@ -190,6 +220,149 @@ async function addUnderstandingGoal() {
   } catch (err) {
     error(`Failed to add understanding goal: ${err}`)
     console.error(err)
+  }
+}
+
+/**
+ * Generate understanding goals using AI
+ * Python ref: agent/tools/llm/generate_understanding_goals.py:57-148
+ */
+async function generateUnderstandingGoals() {
+  const apiKey = settings.value.openaiApiKey
+  if (!apiKey) {
+    error('OpenAI API key not set. Please configure it in settings.')
+    return
+  }
+
+  aiGenerating.value = true
+  aiError.value = null
+  showGoalModal.value = true
+  modalTitle.value = 'Generate Understanding Goals'
+  modalMessage.value = 'Generating expressions you might encounter in the target language...'
+  pendingGoalType.value = 'understanding'
+  generatedGoals.value = []
+
+  try {
+    const result = await aiGenerateUnderstanding(
+      apiKey,
+      props.situation.content,
+      props.targetLanguage,
+      5
+    )
+    generatedGoals.value = result.goals
+    modalMessage.value = result.message
+  } catch (err) {
+    aiError.value = err instanceof Error ? err.message : 'Failed to generate goals'
+    console.error(err)
+  } finally {
+    aiGenerating.value = false
+  }
+}
+
+/**
+ * Generate procedural goals using AI
+ * Python ref: agent/tools/llm/generate_procedural_goals.py:52-150
+ */
+async function generateProceduralGoals() {
+  const apiKey = settings.value.openaiApiKey
+  if (!apiKey) {
+    error('OpenAI API key not set. Please configure it in settings.')
+    return
+  }
+
+  aiGenerating.value = true
+  aiError.value = null
+  showGoalModal.value = true
+  modalTitle.value = 'Generate Procedural Goals'
+  modalMessage.value = 'Generating expressions you might want to say...'
+  pendingGoalType.value = 'procedural'
+  generatedGoals.value = []
+
+  try {
+    const result = await aiGenerateProcedural(
+      apiKey,
+      props.situation.content,
+      props.nativeLanguage,
+      props.targetLanguage,
+      5
+    )
+    generatedGoals.value = result.goals
+    modalMessage.value = result.message
+  } catch (err) {
+    aiError.value = err instanceof Error ? err.message : 'Failed to generate goals'
+    console.error(err)
+  } finally {
+    aiGenerating.value = false
+  }
+}
+
+function closeGoalModal() {
+  showGoalModal.value = false
+  generatedGoals.value = []
+  aiError.value = null
+  pendingGoalType.value = null
+}
+
+/**
+ * Confirm and add selected goals
+ */
+async function confirmGoals(selectedGoals: string[]) {
+  const goalType = pendingGoalType.value
+  if (!goalType) return
+
+  closeGoalModal()
+
+  let successCount = 0
+  let failCount = 0
+
+  for (const goalContent of selectedGoals) {
+    try {
+      if (goalType === 'procedural') {
+        // Add as procedural goal
+        const gloss = await window.electronAPI.gloss.ensure(props.nativeLanguage, goalContent)
+        const tags = gloss.tags || []
+        let modified = false
+        if (!tags.includes('eng:paraphrase')) {
+          tags.push('eng:paraphrase')
+          modified = true
+        }
+        if (!tags.includes('eng:procedural-paraphrase-expression-goal')) {
+          tags.push('eng:procedural-paraphrase-expression-goal')
+          modified = true
+        }
+        if (modified) {
+          gloss.tags = tags
+          await window.electronAPI.gloss.save(gloss)
+        }
+        const situationRef = `${props.situation.language}:${props.situation.slug}`
+        const goalRef = `${gloss.language}:${gloss.slug}`
+        await window.electronAPI.gloss.attachRelation(situationRef, 'children', goalRef)
+      } else {
+        // Add as understanding goal
+        const gloss = await window.electronAPI.gloss.ensure(props.targetLanguage, goalContent)
+        const tags = gloss.tags || []
+        if (!tags.includes('eng:understand-expression-goal')) {
+          tags.push('eng:understand-expression-goal')
+          gloss.tags = tags
+          await window.electronAPI.gloss.save(gloss)
+        }
+        const situationRef = `${props.situation.language}:${props.situation.slug}`
+        const goalRef = `${gloss.language}:${gloss.slug}`
+        await window.electronAPI.gloss.attachRelation(situationRef, 'children', goalRef)
+      }
+      successCount++
+    } catch (err) {
+      console.error('Failed to add goal:', goalContent, err)
+      failCount++
+    }
+  }
+
+  if (successCount > 0) {
+    success(`Added ${successCount} goal${successCount !== 1 ? 's' : ''}`)
+    emit('reload-goals')
+  }
+  if (failCount > 0) {
+    error(`Failed to add ${failCount} goal${failCount !== 1 ? 's' : ''}`)
   }
 }
 </script>

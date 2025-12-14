@@ -6,6 +6,9 @@
         <button class="btn btn-sm" @click="showSituationPicker = true">
           {{ situationDisplay }}
         </button>
+        <button class="btn btn-sm btn-ghost" @click="showSettings = true" title="Settings">
+          <Settings class="w-4 h-4" />
+        </button>
       </div>
     </div>
 
@@ -16,29 +19,41 @@
       @select="changeSituation"
     />
 
-    <!-- Tab navigation -->
-    <div class="tabs tabs-boxed bg-base-200 px-4 pt-2">
-      <button
-        class="tab"
-        :class="{ 'tab-active': activeTab === 'overview' }"
-        @click="activeTab = 'overview'"
-      >
-        <List class="w-4 h-4 mr-2" />
-        Overview
-      </button>
-      <button
-        v-for="goal in goals"
-        :key="goal.id"
-        class="tab"
-        :class="{ 'tab-active': activeTab === goal.id }"
-        @click="activeTab = goal.id"
-      >
-        {{ goal.title }}
-      </button>
-    </div>
+    <!-- Settings Modal -->
+    <SettingsModal
+      :open="showSettings"
+      :current-api-key="settings.openaiApiKey"
+      @close="showSettings = false"
+      @save="saveApiKey"
+    />
 
-    <!-- Tab content -->
-    <div class="flex-1 overflow-y-auto p-4">
+    <!-- Main content: left sidebar + tab content -->
+    <div class="flex-1 flex overflow-hidden">
+      <!-- Left sidebar navigation -->
+      <div class="w-64 bg-base-200 overflow-y-auto border-r border-base-300">
+        <ul class="menu">
+          <li>
+            <a
+              :class="{ 'active': activeTab === 'overview' }"
+              @click="activeTab = 'overview'"
+            >
+              <List class="w-4 h-4" />
+              Overview
+            </a>
+          </li>
+          <li v-for="goal in goals" :key="goal.id">
+            <a
+              :class="{ 'active': activeTab === goal.id }"
+              @click="activeTab = goal.id"
+            >
+              {{ goal.title }}
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Tab content -->
+      <div class="flex-1 overflow-y-auto p-4">
       <div v-if="loading" class="flex justify-center items-center h-full">
         <span class="loading loading-spinner loading-lg"></span>
       </div>
@@ -70,9 +85,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { List } from 'lucide-vue-next'
+import { List, Settings } from 'lucide-vue-next'
 import OverviewTab from './OverviewTab.vue'
 import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
+import SettingsModal from '../../features/settings-modal/SettingsModal.vue'
 import { useToasts } from '../../features/toast-center/useToasts'
 import { loadLanguages, getLanguageSymbol } from '../../entities/languages/loader'
 import { useSettings } from '../../entities/system/settingsStore'
@@ -96,14 +112,15 @@ interface Goal {
 
 const route = useRoute()
 const router = useRouter()
-const { error } = useToasts()
-const { settings } = useSettings()
+const { error, success } = useToasts()
+const { settings, setOpenAIApiKey } = useSettings()
 
 const situation = ref<Situation | null>(null)
 const goals = ref<Goal[]>([])
 const activeTab = ref<string>('overview')
 const loading = ref(false)
 const showSituationPicker = ref(false)
+const showSettings = ref(false)
 const languages = ref<Language[]>([])
 
 // Extract language params from route
@@ -229,6 +246,16 @@ function changeSituation(newSituation: Situation) {
       targetLang: settings.value.targetLanguage!
     }
   })
+}
+
+async function saveApiKey(apiKey: string) {
+  try {
+    await setOpenAIApiKey(apiKey)
+    success('API key saved')
+  } catch (err) {
+    error('Failed to save API key')
+    console.error(err)
+  }
 }
 
 // Watch for route changes to reload situation
