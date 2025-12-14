@@ -9,6 +9,28 @@ const dataRoot = path.join(process.cwd(), 'data')
 const situationsRoot = path.join(process.cwd(), 'situations')
 const storage = new GlossStorage(dataRoot, situationsRoot)
 
+export type SituationExportResult = {
+  success: boolean
+  error?: string
+  totalSituations: number
+  totalExports: number
+  exports: Array<{
+    situation: string
+    native: string
+    target: string
+    situation_json: string
+    glosses_jsonl: string
+    stats: { goal_count: number; gloss_count: number; excluded_count: number }
+  }>
+  skipped: Array<{
+    situation: string
+    native: string
+    target: string
+    reason: string
+  }>
+  outputRoot: string
+}
+
 function loadLanguageCodes(): string[] {
   const langDir = path.join(dataRoot, 'language')
   if (!fs.existsSync(langDir)) return []
@@ -56,29 +78,9 @@ function gatherRefs(root: TreeNode): { refs: string[]; learn: string[] } {
   return { refs, learn }
 }
 
-function performBatchExport(): {
-  success: boolean
-  error?: string
-  totalSituations: number
-  totalExports: number
-  exports: Array<{
-    situation: string
-    native: string
-    target: string
-    situation_json: string
-    glosses_jsonl: string
-    stats: { goal_count: number; gloss_count: number; excluded_count: number }
-  }>
-  skipped: Array<{
-    situation: string
-    native: string
-    target: string
-    reason: string
-  }>
-  outputRoot: string
-} {
+function performBatchExport(): SituationExportResult {
   const outputRoot = situationsRoot
-  const result = {
+  const result: SituationExportResult = {
     success: false,
     error: undefined as string | undefined,
     totalSituations: 0,

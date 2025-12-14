@@ -1,16 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Gloss, UsageInfo } from './main-process/storage/types'
+import type { SituationExportResult } from './main-process/ipc/situationHandlers'
 
 interface Language {
   isoCode: string
   displayName: string
   symbol: string
   aiNote?: string
-}
-
-interface ExportResult {
-  success: boolean
-  message: string
 }
 
 interface DeleteResult {
@@ -55,7 +51,7 @@ export type ElectronAPI = {
   situation: {
     list: (query?: string) => Promise<Gloss[]>
     create: (content: string) => Promise<Gloss>
-    export: () => Promise<ExportResult>
+    export: () => Promise<SituationExportResult>
   }
   settings: {
     get: <T>(key: string) => Promise<T | undefined>
