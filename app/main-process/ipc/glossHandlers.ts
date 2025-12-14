@@ -173,4 +173,18 @@ export function setupGlossHandlers() {
   ipcMain.handle('gloss:markLog', async (_, glossRef: string, marker: string) => {
     markGlossLog(storage, glossRef, marker)
   })
+
+  ipcMain.handle(
+    'gloss:evaluateGoalState',
+    async (_, glossRef: string, nativeLanguage: string, targetLanguage: string) => {
+      const gloss = storage.resolveReference(glossRef)
+      if (!gloss) {
+        throw new Error('Gloss not found')
+      }
+
+      // Import goal state evaluation
+      const { evaluateGoalState } = await import('../storage/goalStateEval')
+      return evaluateGoalState(gloss, storage, nativeLanguage, targetLanguage)
+    }
+  )
 }

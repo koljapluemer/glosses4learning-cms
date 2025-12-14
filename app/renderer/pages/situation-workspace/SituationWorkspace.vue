@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { List } from 'lucide-vue-next'
 import OverviewTab from './OverviewTab.vue'
@@ -74,6 +74,7 @@ import { useToasts } from '../../features/toast-center/useToasts'
 import { loadLanguages, getLanguageSymbol } from '../../entities/languages/loader'
 import { useSettings } from '../../entities/system/settingsStore'
 import type { Language } from '../../entities/languages/types'
+import { detectGoalType } from '../../entities/glosses/goalState'
 
 interface Situation {
   slug: string
@@ -86,7 +87,8 @@ interface Situation {
 interface Goal {
   id: string
   title: string
-  status: 'pending' | 'in_progress' | 'done'
+  type: 'procedural' | 'understanding'
+  state: 'red' | 'yellow' | 'green'
 }
 
 const route = useRoute()
@@ -152,21 +154,50 @@ async function loadSituation() {
 
 async function loadGoals(sit: Situation): Promise<Goal[]> {
   const children = sit.children || []
+  const native = nativeLang.value
+  const target = targetLang.value
+
+  console.log('Loading goals:', { childrenCount: children.length, native, target })
+
+  if (!native || !target) {
+    console.log('Missing native or target language')
+    return []
+  }
+
   const goalPromises = children.map(async (ref) => {
     try {
       const gloss = await window.electronAPI.gloss.resolveRef(ref)
+      console.log('Loaded gloss:', { ref, language: gloss.language, tags: gloss.tags, content: gloss.content })
+
+      // Detect goal type using language and tags
+      const goalType = detectGoalType(gloss, native, target)
+      console.log('Detected goal type:', { ref, goalType, gloss })
+
+      // Skip if not a valid goal for this native/target pair
+      if (!goalType) {
+        console.log('Skipping - not a valid goal type for this language pair')
+        return null
+      }
+
+      // Evaluate goal state
+      const evaluation = await window.electronAPI.gloss.evaluateGoalState(ref, native, target)
+
       return {
         id: gloss.slug,
         title: gloss.content,
-        status: 'pending' as const
+        type: goalType,
+        state: evaluation.state
       }
-    } catch {
+    } catch (err) {
+      console.error('Failed to load goal:', err)
       return null
     }
   })
 
   const results = await Promise.all(goalPromises)
-  return results.filter((g): g is Goal => g !== null)
+  const filtered = results.filter((g): g is Goal => g !== null)
+  console.log('Final goals loaded:', filtered)
+  return filtered
 }
 
 function addGoal() {
@@ -192,6 +223,14 @@ function changeSituation(newSituation: Situation) {
     }
   })
 }
+
+// Watch for route changes to reload situation
+watch(
+  () => route.params,
+  () => {
+    loadSituation()
+  }
+)
 
 onMounted(async () => {
   // Load languages for display

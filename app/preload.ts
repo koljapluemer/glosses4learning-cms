@@ -42,6 +42,11 @@ export type ElectronAPI = {
       noteLanguage: string
     ) => Promise<Gloss>
     markLog: (glossRef: string, marker: string) => Promise<void>
+    evaluateGoalState: (
+      glossRef: string,
+      nativeLanguage: string,
+      targetLanguage: string
+    ) => Promise<{ state: 'red' | 'yellow' | 'green'; log: string }>
   }
   language: {
     list: () => Promise<Language[]>
@@ -88,7 +93,9 @@ const api: ElectronAPI = {
         noteText,
         noteLanguage
       ),
-    markLog: (glossRef, marker) => ipcRenderer.invoke('gloss:markLog', glossRef, marker)
+    markLog: (glossRef, marker) => ipcRenderer.invoke('gloss:markLog', glossRef, marker),
+    evaluateGoalState: (glossRef, nativeLanguage, targetLanguage) =>
+      ipcRenderer.invoke('gloss:evaluateGoalState', glossRef, nativeLanguage, targetLanguage)
   },
   language: {
     list: () => ipcRenderer.invoke('language:list')
