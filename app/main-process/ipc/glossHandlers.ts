@@ -3,6 +3,7 @@ import path from 'path'
 import { GlossStorage } from '../storage/fsGlossStorage'
 import type { Gloss, UsageInfo } from '../storage/types'
 import { RELATIONSHIP_FIELDS, type RelationshipField } from '../storage/relationRules'
+import { attachTranslationWithNote, markGlossLog } from '../storage/glossOperations'
 
 // Initialize storage with data/ and situations/ paths
 const dataRoot = path.join(process.cwd(), 'data')
@@ -92,9 +93,8 @@ export function setupGlossHandlers() {
       usedAsTranslation: []
     }
 
-    const allGlosses = storage.listGlosses()
-
-    for (const gloss of allGlosses) {
+    // CRITICAL FIX: Use lazy iteration instead of loading all glosses into memory
+    for (const gloss of storage.iterateAllGlosses()) {
       const glossRef = `${gloss.language}:${gloss.slug}`
 
       if (gloss.parts?.includes(ref)) {
@@ -113,5 +113,64 @@ export function setupGlossHandlers() {
 
   ipcMain.handle('gloss:list', async (_, language?: string) => {
     return storage.listGlosses(language)
+  })
+
+  // New handlers for Phase 1 storage improvements
+  ipcMain.handle(
+    'gloss:deleteWithCleanup',
+    async (_, language: string, slug: string) => {
+      return storage.deleteGlossWithCleanup(language, slug)
+    }
+  )
+
+  ipcMain.handle('gloss:findByTag', async (_, tagRef: string, limit: number = 100) => {
+    const results: Gloss[] = []
+    for (const gloss of storage.findGlossesByTag(tagRef)) {
+      results.push(gloss)
+      if (results.length >= limit) break // Prevent unbounded results
+    }
+    return results
+  })
+
+  ipcMain.handle(
+    'gloss:searchByContent',
+    async (_, language: string, substring: string, limit: number = 50) => {
+      const results: Gloss[] = []
+      for (const gloss of storage.searchGlossesByContent(language, substring)) {
+        results.push(gloss)
+        if (results.length >= limit) break
+      }
+      return results
+    }
+  )
+
+  ipcMain.handle(
+    'gloss:attachTranslationWithNote',
+    async (
+      _,
+      sourceRef: string,
+      translationText: string,
+      translationLanguage: string,
+      noteText: string | null,
+      noteLanguage: string
+    ) => {
+      const sourceGloss = storage.resolveReference(sourceRef)
+      if (!sourceGloss) {
+        throw new Error('Source gloss not found')
+      }
+
+      return attachTranslationWithNote(
+        storage,
+        sourceGloss,
+        translationText,
+        translationLanguage,
+        noteText,
+        noteLanguage
+      )
+    }
+  )
+
+  ipcMain.handle('gloss:markLog', async (_, glossRef: string, marker: string) => {
+    markGlossLog(storage, glossRef, marker)
   })
 }

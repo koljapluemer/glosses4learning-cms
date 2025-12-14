@@ -204,6 +204,119 @@ export class GlossStorage {
     }
   }
 
+  /**
+   * Generator that yields glosses one at a time for a language (lazy iteration)
+   * CRITICAL: Use this instead of listGlosses to avoid loading millions into memory
+   */
+  *iterateGlossesByLanguage(language: string): Generator<Gloss> {
+    const dir = this.languageDir(language)
+    if (!fs.existsSync(dir)) return
+
+    const files = fs.readdirSync(dir)
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue
+      const slug = file.replace('.json', '')
+      const gloss = this.loadGloss(language, slug)
+      if (gloss) yield gloss
+    }
+  }
+
+  /**
+   * Generator for all glosses across all languages (lazy iteration)
+   * CRITICAL: Use this instead of listGlosses() to avoid loading millions into memory
+   */
+  *iterateAllGlosses(): Generator<Gloss> {
+    const glossDir = path.join(this.dataRoot, 'gloss')
+    if (!fs.existsSync(glossDir)) return
+
+    const languages = fs.readdirSync(glossDir)
+    for (const lang of languages) {
+      const langPath = path.join(glossDir, lang)
+      if (!fs.statSync(langPath).isDirectory()) continue
+
+      yield* this.iterateGlossesByLanguage(lang)
+    }
+  }
+
+  /**
+   * Find glosses by tag (lazy iteration)
+   */
+  *findGlossesByTag(tagRef: string): Generator<Gloss> {
+    for (const gloss of this.iterateAllGlosses()) {
+      if (gloss.tags.includes(tagRef)) {
+        yield gloss
+      }
+    }
+  }
+
+  /**
+   * Substring search across language (lazy iteration)
+   */
+  *searchGlossesByContent(language: string, substring: string): Generator<Gloss> {
+    const lowerQuery = substring.toLowerCase()
+    for (const gloss of this.iterateGlossesByLanguage(language)) {
+      if (gloss.content.toLowerCase().includes(lowerQuery)) {
+        yield gloss
+      }
+    }
+  }
+
+  /**
+   * Delete gloss and clean up all references across ALL glosses
+   * Port of src/shared/gloss_actions.py:19-66
+   *
+   * CRITICAL: Uses lazy iteration to scan all glosses without loading into memory
+   */
+  deleteGlossWithCleanup(language: string, slug: string): {
+    success: boolean
+    message: string
+    refsRemoved: number
+  } {
+    // 1. Verify gloss exists
+    const gloss = this.loadGloss(language, slug)
+    if (!gloss) {
+      return {
+        success: false,
+        message: `Gloss not found: ${language}:${slug}`,
+        refsRemoved: 0
+      }
+    }
+
+    // 2. Delete the file
+    this.deleteGloss(language, slug)
+
+    // 3. CRITICAL: Scan all glosses and remove references (LAZY ITERATION!)
+    const targetRef = `${language}:${slug}`
+    let refsRemoved = 0
+
+    for (const item of this.iterateAllGlosses()) {
+      let changed = false
+      const itemRecord = item as Record<string, string[]>
+
+      // Check ALL 12 relationship fields
+      for (const field of RELATIONSHIP_FIELDS) {
+        const refs = itemRecord[field] ?? []
+        const filtered = refs.filter((ref) => ref !== targetRef)
+
+        if (filtered.length !== refs.length) {
+          itemRecord[field] = filtered
+          changed = true
+        }
+      }
+
+      if (changed) {
+        refsRemoved++
+        this.saveGloss(item)
+      }
+    }
+
+    return {
+      success: true,
+      message: `Deleted ${targetRef}. Cleaned references in ${refsRemoved} glosses.`,
+      refsRemoved
+    }
+  }
+
   listGlosses(language?: string): Gloss[] {
     const glosses: Gloss[] = []
 
