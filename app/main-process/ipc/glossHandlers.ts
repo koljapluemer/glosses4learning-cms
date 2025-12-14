@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import path from 'path'
 import { GlossStorage } from '../storage/fsGlossStorage'
 import type { Gloss, UsageInfo } from '../storage/types'
-import { RELATIONSHIP_FIELDS } from '../storage/relationRules'
+import { RELATIONSHIP_FIELDS, type RelationshipField } from '../storage/relationRules'
 
 // Initialize storage with data/ and situations/ paths
 const dataRoot = path.join(process.cwd(), 'data')
@@ -40,11 +40,11 @@ export function setupGlossHandlers() {
         throw new Error('Base or target gloss not found')
       }
 
-      if (!RELATIONSHIP_FIELDS.includes(field as any)) {
+      if (!RELATIONSHIP_FIELDS.includes(field as RelationshipField)) {
         throw new Error(`Invalid relationship field: ${field}`)
       }
 
-      storage.attachRelation(base, field as any, target)
+      storage.attachRelation(base, field as RelationshipField, target)
     }
   )
 
@@ -57,11 +57,11 @@ export function setupGlossHandlers() {
         throw new Error('Base gloss not found')
       }
 
-      if (!RELATIONSHIP_FIELDS.includes(field as any)) {
+      if (!RELATIONSHIP_FIELDS.includes(field as RelationshipField)) {
         throw new Error(`Invalid relationship field: ${field}`)
       }
 
-      storage.detachRelation(base, field as any, targetRef)
+      storage.detachRelation(base, field as RelationshipField, targetRef)
     }
   )
 

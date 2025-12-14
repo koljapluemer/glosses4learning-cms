@@ -2,31 +2,87 @@
   <div>
     <h1 class="text-3xl font-bold mb-4">Glosses4Learning CMS</h1>
 
-    <div class="card shadow">
-      <div class="card-body">
-        <h2 class="card-title">Phase 1: Foundation Complete!</h2>
-        <p>The basic Electron + Vue + TypeScript + Tailwind + DaisyUI setup is ready.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h2 class="card-title">Situations</h2>
+          <p class="text-sm text-base-content/70">
+            Work on language learning situations and their goals
+          </p>
+          <div class="card-actions justify-end mt-4">
+            <button class="btn btn-primary" @click="showSituationPicker = true">
+              <FolderOpen class="w-4 h-4 mr-2" />
+              Open Situation
+            </button>
+          </div>
+        </div>
+      </div>
 
-        <div class="mt-4">
-          <button class="btn btn-primary" @click="testIPC">Test IPC</button>
-          <p v-if="testResult" class="mt-2">{{ testResult }}</p>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h2 class="card-title">Export</h2>
+          <p class="text-sm text-base-content/70">
+            Export situations and glosses for the learning app
+          </p>
+          <div class="card-actions justify-end mt-4">
+            <button class="btn btn-secondary" disabled>
+              <Download class="w-4 h-4 mr-2" />
+              Export (Coming Soon)
+            </button>
+          </div>
         </div>
       </div>
     </div>
+
+    <SituationPicker
+      :open="showSituationPicker"
+      @close="showSituationPicker = false"
+      @select="openSituation"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { FolderOpen, Download } from 'lucide-vue-next'
+import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
+import { useSettings } from '../../entities/system/settingsStore'
+import { useToasts } from '../../features/toast-center/useToasts'
 
-const testResult = ref('')
+const router = useRouter()
+const showSituationPicker = ref(false)
+const { settings } = useSettings()
+const { error } = useToasts()
 
-async function testIPC() {
-  try {
-    const languages = await window.electronAPI.language.list()
-    testResult.value = `Loaded ${languages.length} languages: ${languages.map((l: any) => l.displayName).join(', ')}`
-  } catch (error) {
-    testResult.value = `Error: ${error}`
+interface Situation {
+  slug: string
+  content: string
+  language: string
+  tags: string[]
+}
+
+function openSituation(situation: Situation) {
+  showSituationPicker.value = false
+
+  // Languages are now required from settings
+  const native = settings.value.nativeLanguage
+  const target = settings.value.targetLanguage
+
+  if (!native || !target) {
+    // Should never happen due to picker validation, but guard anyway
+    error('Languages not set')
+    return
   }
+
+  router.push({
+    name: 'situation-workspace',
+    params: {
+      situationLang: situation.language,
+      situationSlug: situation.slug,
+      nativeLang: native,
+      targetLang: target
+    }
+  })
 }
 </script>

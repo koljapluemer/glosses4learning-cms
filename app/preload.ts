@@ -1,25 +1,38 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { Gloss, UsageInfo } from './main-process/storage/types'
+
+interface Language {
+  isoCode: string
+  displayName: string
+  symbol: string
+  aiNote?: string
+}
+
+interface ExportResult {
+  success: boolean
+  message: string
+}
 
 export type ElectronAPI = {
   gloss: {
-    load: (language: string, slug: string) => Promise<any>
-    save: (gloss: any) => Promise<void>
-    ensure: (language: string, content: string) => Promise<any>
+    load: (language: string, slug: string) => Promise<Gloss | null>
+    save: (gloss: Gloss) => Promise<void>
+    ensure: (language: string, content: string) => Promise<Gloss>
     delete: (language: string, slug: string) => Promise<void>
-    resolveRef: (ref: string) => Promise<any>
+    resolveRef: (ref: string) => Promise<Gloss>
     attachRelation: (baseRef: string, field: string, targetRef: string) => Promise<void>
     detachRelation: (baseRef: string, field: string, targetRef: string) => Promise<void>
     updateContent: (ref: string, newContent: string) => Promise<void>
-    checkReferences: (ref: string) => Promise<any>
-    list: (language?: string) => Promise<any[]>
+    checkReferences: (ref: string) => Promise<UsageInfo>
+    list: (language?: string) => Promise<Gloss[]>
   }
   language: {
-    list: () => Promise<any[]>
+    list: () => Promise<Language[]>
   }
   situation: {
-    list: (query?: string) => Promise<any[]>
-    create: (content: string) => Promise<any>
-    export: () => Promise<any>
+    list: (query?: string) => Promise<Gloss[]>
+    create: (content: string) => Promise<Gloss>
+    export: () => Promise<ExportResult>
   }
   settings: {
     get: <T>(key: string) => Promise<T | undefined>

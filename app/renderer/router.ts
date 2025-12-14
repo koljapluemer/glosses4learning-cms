@@ -7,6 +7,11 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: () => import('./pages/dashboard/DashboardPage.vue')
+    },
+    {
+      path: '/situation/:situationLang/:situationSlug/:nativeLang/:targetLang',
+      name: 'situation-workspace',
+      component: () => import('./pages/situation-workspace/SituationWorkspace.vue')
     }
   ]
 })

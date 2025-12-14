@@ -125,7 +125,7 @@ export class GlossStorage {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
   }
 
-  private fromDict(data: any, slug?: string, language?: string): Gloss {
+  private fromDict(data: Record<string, unknown>, slug?: string, language?: string): Gloss {
     return {
       content: data.content ?? '',
       language: language?.toLowerCase() ?? data.language?.toLowerCase() ?? 'und',
@@ -165,28 +165,30 @@ export class GlossStorage {
     }
 
     const ref = `${target.language}:${target.slug}`
-    const existing = (base as any)[field] ?? []
+    const baseRecord = base as Record<string, string[]>
+    const existing = baseRecord[field] ?? []
 
     if (!existing.includes(ref)) {
-      (base as any)[field] = [...existing, ref]
+      baseRecord[field] = [...existing, ref]
       this.saveGloss(base)
     }
 
     // Handle symmetrical relations
     if (SYMMETRICAL_RELATIONS.has(field)) {
       const backRef = `${base.language}:${base.slug}`
-      const targetRelations = (target as any)[field] ?? []
+      const targetRecord = target as Record<string, string[]>
+      const targetRelations = targetRecord[field] ?? []
       if (!targetRelations.includes(backRef)) {
-        (target as any)[field] = [...targetRelations, backRef]
+        targetRecord[field] = [...targetRelations, backRef]
         this.saveGloss(target)
       }
     }
   }
 
   detachRelation(base: Gloss, field: RelationshipField, targetRef: string): void {
-    const baseAny = base as Record<string, any>
-    const existing = baseAny[field] ?? []
-    baseAny[field] = existing.filter((r: string) => r !== targetRef)
+    const baseRecord = base as Record<string, string[]>
+    const existing = baseRecord[field] ?? []
+    baseRecord[field] = existing.filter((r: string) => r !== targetRef)
     this.saveGloss(base)
 
     // Handle symmetrical cleanup
@@ -194,9 +196,9 @@ export class GlossStorage {
       const target = this.resolveReference(targetRef)
       if (target) {
         const backRef = `${base.language}:${base.slug}`
-        const targetAny = target as Record<string, any>
-        const targetRelations = targetAny[field] ?? []
-        targetAny[field] = targetRelations.filter((r: string) => r !== backRef)
+        const targetRecord = target as Record<string, string[]>
+        const targetRelations = targetRecord[field] ?? []
+        targetRecord[field] = targetRelations.filter((r: string) => r !== backRef)
         this.saveGloss(target)
       }
     }
