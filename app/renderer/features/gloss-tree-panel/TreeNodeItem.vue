@@ -1,9 +1,18 @@
 <template>
   <div :style="{ marginLeft: `${depth * 1.25}rem` }">
-    <!-- Node with children - collapsible -->
-    <div v-if="hasChildren" class="bg-base-100 shadow rounded-box">
+    <div class="bg-base-100 shadow rounded-box">
       <div class="flex items-center gap-2 flex-wrap px-3 py-2">
+        <NodeContent :node="node" />
+        <NodeActions
+          :node="node"
+          :can-detach="canDetach"
+          @open-gloss="$emit('open-gloss', glossRef(node.gloss))"
+          @delete-gloss="handleDelete"
+          @toggle-exclude="handleToggleExclude"
+          @detach="handleDetach"
+        />
         <button
+          v-if="hasChildren"
           class="btn btn-ghost btn-xs shrink-0"
           type="button"
           :aria-expanded="isExpanded"
@@ -15,47 +24,27 @@
             :class="{ 'rotate-90': isExpanded }"
           />
         </button>
-        <NodeContent :node="node" />
-        <NodeActions
-          :node="node"
-          :can-detach="canDetach"
-          @open-gloss="$emit('open-gloss', glossRef(node.gloss))"
-          @delete-gloss="handleDelete"
-          @toggle-exclude="handleToggleExclude"
-          @detach="handleDetach"
-        />
       </div>
-      <div v-if="isExpanded" class="px-3 pb-3 space-y-2">
+      <div v-if="hasChildren && isExpanded" class="px-3 pb-3 space-y-2">
         <TreeNodeItem
           v-for="(child, index) in node.children"
           :key="index"
           :node="child"
           :depth="depth + 1"
+          :expanded-refs="expandedRefs"
           @open-gloss="$emit('open-gloss', $event)"
           @delete-gloss="$emit('delete-gloss', $event)"
           @toggle-exclude="$emit('toggle-exclude', $event)"
           @detach="$emit('detach', $event)"
+          @toggle-expand="(ref, expanded) => $emit('toggle-expand', ref, expanded)"
         />
       </div>
-    </div>
-
-    <!-- Leaf node - no children -->
-    <div v-else class="bg-base-100 shadow rounded-box px-3 py-2 flex items-center gap-2 flex-wrap">
-      <NodeContent :node="node" />
-      <NodeActions
-        :node="node"
-        :can-detach="canDetach"
-        @open-gloss="$emit('open-gloss', glossRef(node.gloss))"
-        @delete-gloss="handleDelete"
-        @toggle-exclude="handleToggleExclude"
-        @detach="handleDetach"
-      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { ChevronRight } from 'lucide-vue-next'
 import type { TreeNode } from '../../entities/glosses/treeBuilder'
 import NodeContent from './NodeContent.vue'
@@ -64,6 +53,7 @@ import NodeActions from './NodeActions.vue'
 const props = defineProps<{
   node: TreeNode
   depth: number
+  expandedRefs?: Record<string, boolean>
 }>()
 
 const emit = defineEmits<{
@@ -71,10 +61,14 @@ const emit = defineEmits<{
   'delete-gloss': [ref: string]
   'toggle-exclude': [ref: string]
   'detach': [parentRef: string, field: string, childRef: string]
+  'toggle-expand': [ref: string, expanded: boolean]
 }>()
 
 const hasChildren = computed(() => props.node.children && props.node.children.length > 0)
-const isExpanded = ref(false)
+const isExpanded = computed(() => {
+  const ref = glossRef(props.node.gloss)
+  return props.expandedRefs ? Boolean(props.expandedRefs[ref]) : false
+})
 const canDetach = computed(() => Boolean(props.node.parentRef && props.node.viaField))
 
 function glossRef(gloss: typeof props.node.gloss): string {
@@ -82,7 +76,7 @@ function glossRef(gloss: typeof props.node.gloss): string {
 }
 
 function toggleExpanded() {
-  isExpanded.value = !isExpanded.value
+  emit('toggle-expand', glossRef(props.node.gloss), !isExpanded.value)
 }
 
 function handleDelete() {

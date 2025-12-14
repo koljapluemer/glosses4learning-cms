@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-center gap-2 flex-wrap">
-    <!-- Marker badge (PROC/UNDR/USG) -->
+    <!-- Marker badge (PROC/UNDR) -->
     <span v-if="node.marker" class="badge badge-outline">{{ node.marker }}</span>
 
     <!-- State badge (RED/YELLOW) only on root -->

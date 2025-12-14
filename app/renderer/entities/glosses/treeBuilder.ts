@@ -248,7 +248,7 @@ export function buildGoalNodes(
       gloss: uGloss,
       display: paraphraseDisplay(uGloss),
       children: [],
-      marker: 'USG ',
+      marker: '',
       bold: false,
       role: 'usage',
       warn_native_missing: warnings.warn_native_missing,

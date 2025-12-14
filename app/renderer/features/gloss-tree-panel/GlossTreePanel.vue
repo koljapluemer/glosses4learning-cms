@@ -7,10 +7,12 @@
         :key="index"
         :node="node"
         :depth="0"
+        :expanded-refs="expandedRefs"
         @open-gloss="$emit('open-gloss', $event)"
         @delete-gloss="$emit('delete-gloss', $event)"
         @toggle-exclude="$emit('toggle-exclude', $event)"
         @detach="$emit('detach', $event)"
+        @toggle-expand="(ref, expanded) => $emit('toggle-expand', ref, expanded)"
       />
     </div>
 
@@ -29,6 +31,7 @@ import type { TreeNode } from '../../entities/glosses/treeBuilder'
 
 defineProps<{
   nodes: TreeNode[]
+  expandedRefs?: Record<string, boolean>
 }>()
 
 defineEmits<{
@@ -36,5 +39,6 @@ defineEmits<{
   'delete-gloss': [ref: string]
   'toggle-exclude': [ref: string]
   'detach': [parentRef: string, field: string, childRef: string]
+  'toggle-expand': [ref: string, expanded: boolean]
 }>()
 </script>

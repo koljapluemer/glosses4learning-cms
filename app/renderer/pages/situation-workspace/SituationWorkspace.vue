@@ -124,11 +124,43 @@
             <GlossTreePanel
               v-else
               :nodes="goalNodes"
+              :expanded-refs="expandedRefs"
               @open-gloss="openGloss"
               @delete-gloss="deleteGloss"
               @toggle-exclude="toggleExclude"
               @detach="detachRelation"
+              @toggle-expand="onToggleExpand"
             />
+
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="badge badge-outline">Legend</div>
+              <div class="flex items-center gap-1 text-sm">
+                <span class="badge badge-outline badge-xs">PROC</span><span>Procedural goal</span>
+              </div>
+              <div class="flex items-center gap-1 text-sm">
+                <span class="badge badge-outline badge-xs">UNDR</span><span>Understanding goal</span>
+              </div>
+              <div class="flex items-center gap-1 text-sm">
+                <Layers class="w-3 h-3" /><span>Part</span>
+              </div>
+              <div class="flex items-center gap-1 text-sm">
+                <Languages class="w-3 h-3" /><span>Translation</span>
+              </div>
+              <div class="flex items-center gap-1 text-sm">
+                <MessageSquareWarning class="w-3 h-3 text-warning" /><span>Usage missing</span>
+              </div>
+              <div class="flex items-center gap-1 text-sm">
+                <Languages class="w-3 h-3 text-warning" /><span>Translation missing</span>
+              </div>
+              <div class="flex items-center gap-1 text-sm">
+                <Layers class="w-3 h-3 text-warning" /><span>Parts missing</span>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button class="btn btn-sm" @click="expandAll">Expand all</button>
+              <button class="btn btn-sm" @click="collapseAll">Collapse all</button>
+            </div>
 
             <AiBatchToolPanel
               v-if="activeGoalRef"
@@ -177,7 +209,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Home, List, Settings, Info } from 'lucide-vue-next'
+import {
+  Home,
+  List,
+  Settings,
+  Info,
+  Layers,
+  Languages,
+  MessageSquareWarning
+} from 'lucide-vue-next'
 import OverviewTab from './OverviewTab.vue'
 import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
 import SettingsModal from '../../features/settings-modal/SettingsModal.vue'
@@ -219,6 +259,7 @@ const activeGlossRef = ref<string | null>(null)
 const showStateLog = ref(false)
 const stateLog = ref('')
 const stateLogLoading = ref(false)
+const expandedRefs = ref<Record<string, boolean>>({})
 
 // Extract language params from route
 const nativeLang = computed(() => route.params.nativeLang as string)
@@ -291,6 +332,27 @@ const goalStats = computed(() => {
     missingUsage: toArray(perGoal.usage_missing)
   }
 })
+
+function expansionStorageKey(goalId: string) {
+  return `treeExpansion:${goalId}`
+}
+
+function loadExpansionState(goalId: string) {
+  try {
+    const raw = localStorage.getItem(expansionStorageKey(goalId))
+    expandedRefs.value = raw ? (JSON.parse(raw) as Record<string, boolean>) : {}
+  } catch {
+    expandedRefs.value = {}
+  }
+}
+
+function saveExpansionState(goalId: string) {
+  try {
+    localStorage.setItem(expansionStorageKey(goalId), JSON.stringify(expandedRefs.value))
+  } catch (err) {
+    console.warn('Failed to persist tree expansion', err)
+  }
+}
 
 async function loadSituation() {
   loading.value = true
@@ -488,6 +550,13 @@ async function refreshTree(currentSituation: Gloss) {
     treeStats.value = stats
     goals.value = mapGoalsFromNodes(nodes)
 
+    // Load stored expansion for active goal
+    if (activeTab.value && activeTab.value !== 'overview') {
+      loadExpansionState(activeTab.value)
+    } else {
+      expandedRefs.value = {}
+    }
+
     // Ensure the active tab still exists
     if (activeTab.value !== 'overview') {
       const exists = goals.value.some((g) => g.id === activeTab.value)
@@ -660,11 +729,58 @@ async function openStateLog() {
   }
 }
 
+function onToggleExpand(ref: string, expanded: boolean) {
+  expandedRefs.value = { ...expandedRefs.value, [ref]: expanded }
+  if (activeGoalRef.value) {
+    saveExpansionState(activeGoalRef.value)
+  }
+}
+
+function collectRefs(nodes: TreeNode[]): string[] {
+  const refs: string[] = []
+  const walk = (n: TreeNode) => {
+    const ref = `${n.gloss.language}:${n.gloss.slug}`
+    refs.push(ref)
+    for (const child of n.children || []) {
+      walk(child)
+    }
+  }
+  nodes.forEach(walk)
+  return refs
+}
+
+function expandAll() {
+  if (!goalNodes.value.length) return
+  const refs = collectRefs(goalNodes.value)
+  const next: Record<string, boolean> = {}
+  refs.forEach((r) => {
+    next[r] = true
+  })
+  expandedRefs.value = next
+  if (activeGoalRef.value) saveExpansionState(activeGoalRef.value)
+}
+
+function collapseAll() {
+  expandedRefs.value = {}
+  if (activeGoalRef.value) saveExpansionState(activeGoalRef.value)
+}
+
 // Watch for route changes to reload situation
 watch(
   () => route.params,
   () => {
     loadSituation()
+  }
+)
+
+watch(
+  () => activeTab.value,
+  (val) => {
+    if (val && val !== 'overview') {
+      loadExpansionState(val)
+    } else {
+      expandedRefs.value = {}
+    }
   }
 )
 
