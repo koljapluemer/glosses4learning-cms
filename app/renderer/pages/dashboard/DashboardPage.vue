@@ -44,13 +44,14 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { FolderOpen, Download } from 'lucide-vue-next'
 import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
 import { useSettings } from '../../entities/system/settingsStore'
 import { useToasts } from '../../features/toast-center/useToasts'
 
 const router = useRouter()
+const route = useRoute()
 const showSituationPicker = ref(false)
 const { settings } = useSettings()
 const { error } = useToasts()
@@ -88,6 +89,9 @@ function openSituation(situation: Situation) {
 
 onMounted(async () => {
   // Auto-open last situation if available and languages set
+  if (route.query.noAutoOpen) {
+    return
+  }
   const { nativeLanguage, targetLanguage, lastSituationRef } = settings.value
   if (nativeLanguage && targetLanguage && lastSituationRef) {
     const [lang, ...slugParts] = lastSituationRef.split(':')

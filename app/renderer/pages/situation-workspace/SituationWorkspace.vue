@@ -3,7 +3,10 @@
     <h1 class="sr-only">Situation Workspace</h1>
     <!-- Header with situation selector button -->
     <div class="navbar bg-base-200 shadow-sm">
-      <div class="flex-1 gap-2">
+      <div class="flex-1 flex items-center gap-2">
+        <button class="btn btn-sm btn-ghost btn-square" title="Home" @click="goHome">
+          <Home class="w-4 h-4" />
+        </button>
         <button class="btn btn-sm" @click="showSituationPicker = true">
           {{ situationDisplay }}
         </button>
@@ -153,7 +156,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { List, Settings } from 'lucide-vue-next'
+import { Home, List, Settings } from 'lucide-vue-next'
 import OverviewTab from './OverviewTab.vue'
 import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
 import SettingsModal from '../../features/settings-modal/SettingsModal.vue'
@@ -374,6 +377,10 @@ function changeSituation(newSituation: Gloss) {
 function openSituationGloss(situation: Gloss) {
   activeGlossRef.value = `${situation.language}:${situation.slug}`
   glossModalOpen.value = true
+}
+
+function goHome() {
+  router.push({ name: 'dashboard', query: { noAutoOpen: '1' } })
 }
 
 async function saveApiKey(apiKey: string) {
