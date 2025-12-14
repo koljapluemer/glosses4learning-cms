@@ -6,75 +6,75 @@
 
     <div v-else-if="!gloss" class="alert alert-error">Gloss not found.</div>
 
-    <div v-else class="space-y-6">
-      <!-- Core info -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <fieldset class="fieldset md:col-span-2">
-          <label class="label">Content ({{ gloss.language.toUpperCase() }})</label>
-          <input
-            v-model="contentDraft"
-            type="text"
-            class="input input-bordered w-full"
-            @blur="handleContentBlur"
-          />
-        </fieldset>
-        <div class="flex items-end gap-3">
-          <button class="btn btn-outline btn-sm" @click="toggleNeedsCheck">
-            {{ gloss.needsHumanCheck ? 'Unset needs check' : 'Mark needs check' }}
-          </button>
-          <button class="btn btn-outline btn-sm" @click="toggleExclude">
-            {{ gloss.excludeFromLearning ? 'Include in learning' : 'Exclude from learning' }}
-          </button>
-        </div>
+    <div v-else class="flex flex-col gap-6">
+      <fieldset class="fieldset">
+        <label for="gloss-content" class="label">
+          Content ({{ gloss.language.toUpperCase() }})
+        </label>
+        <input
+          id="gloss-content"
+          v-model="contentDraft"
+          type="text"
+          class="input input-bordered w-full"
+          @blur="handleContentBlur"
+        />
+      </fieldset>
+
+      <div class="flex flex-wrap gap-2">
+        <button class="btn btn-outline" @click="toggleNeedsCheck">
+          {{ gloss.needsHumanCheck ? 'Unset needs check' : 'Mark needs check' }}
+        </button>
+        <button class="btn btn-outline" @click="toggleExclude">
+          {{ gloss.excludeFromLearning ? 'Include in learning' : 'Exclude from learning' }}
+        </button>
       </div>
 
-      <!-- Translations -->
-      <section>
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-3">
-            <h3 class="font-semibold">Translations</h3>
-            <span v-if="translationBlocked" class="badge badge-warning badge-outline text-xs">
-              marked impossible
-            </span>
-          </div>
-          <div class="flex gap-2">
-            <input
-              v-model="translationDraft"
-              type="text"
-              class="input input-bordered input-sm w-64"
-              :placeholder="`Add translation (${otherLanguage?.toUpperCase() || 'lang'})`"
-              list="translation-suggestions"
-              @keyup.enter="addTranslation"
-            />
-            <datalist id="translation-suggestions">
-              <option v-for="s in translationSuggestions" :key="s.slug" :value="s.content" />
-            </datalist>
-            <button class="btn btn-sm" :disabled="!translationDraft.trim()" @click="addTranslation">
-              Add
-            </button>
-            <button
-              class="btn btn-outline btn-sm"
-              v-if="!hasTranslations"
-              :disabled="translationBlocked"
-              @click="markTranslationImpossible"
-            >
-              Mark impossible
-            </button>
-            <input
-              v-model="translationContext"
-              type="text"
-              class="input input-bordered input-sm w-48"
-              placeholder="Context (optional)"
-            />
-            <button
-              class="btn btn-sm"
-              :disabled="aiTranslating || translationBlocked"
-              @click="generateTranslations"
-            >
-              AI add
-            </button>
-          </div>
-        </div>
+      <section class="flex flex-col gap-4">
+        <fieldset class="fieldset">
+          <label for="translation-input" class="label">
+            Translation ({{ otherLanguage?.toUpperCase() || 'LANG' }})
+          </label>
+          <input
+            id="translation-input"
+            v-model="translationDraft"
+            type="text"
+            class="input input-bordered w-full"
+            :placeholder="`Add translation (${otherLanguage?.toUpperCase() || 'lang'})`"
+            list="translation-suggestions"
+            @keyup.enter="addTranslation"
+          />
+          <datalist id="translation-suggestions">
+            <option v-for="s in translationSuggestions" :key="s.slug" :value="s.content" />
+          </datalist>
+        </fieldset>
+        <button class="btn self-start" :disabled="!translationDraft.trim()" @click="addTranslation">
+          Add translation
+        </button>
+        <fieldset class="fieldset">
+          <label for="translation-context" class="label">Context (optional)</label>
+          <input
+            id="translation-context"
+            v-model="translationContext"
+            type="text"
+            class="input input-bordered w-full"
+            placeholder="Context for AI suggestions"
+          />
+        </fieldset>
+        <button
+          class="btn self-start"
+          :disabled="aiTranslating || translationBlocked"
+          @click="generateTranslations"
+        >
+          AI add translations
+        </button>
+        <button
+          class="btn btn-outline self-start"
+          v-if="!hasTranslations"
+          :disabled="translationBlocked"
+          @click="markTranslationImpossible"
+        >
+          Mark translation impossible
+        </button>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="ref in gloss.translations || []"
@@ -89,52 +89,43 @@
         </div>
       </section>
 
-      <!-- Parts -->
-      <section>
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-3">
-            <h3 class="font-semibold">Parts</h3>
-            <span v-if="partsBlocked" class="badge badge-warning badge-outline text-xs">
-              marked unsplittable
-            </span>
-          </div>
-          <div class="flex gap-2">
-            <input
-              v-model="partDraft"
-              type="text"
-              class="input input-bordered input-sm w-64"
-              :placeholder="`Add part (${gloss.language.toUpperCase()})`"
-              list="part-suggestions"
-              @keyup.enter="addPart"
-            />
-            <datalist id="part-suggestions">
-              <option v-for="s in partSuggestions" :key="s.slug" :value="s.content" />
-            </datalist>
-            <button class="btn btn-sm" :disabled="!partDraft.trim()" @click="addPart">
-              Add
-            </button>
-            <button
-              class="btn btn-outline btn-sm"
-              :disabled="partsBlocked || hasParts"
-              @click="markUnsplittable"
-            >
-              Mark unsplittable
-            </button>
-            <input
-              v-model="partsContext"
-              type="text"
-              class="input input-bordered input-sm w-48"
-              placeholder="Context (optional)"
-            />
-            <button
-              class="btn btn-sm"
-              :disabled="aiParts || partsBlocked"
-              @click="generateParts"
-            >
-              AI add
-            </button>
-          </div>
-        </div>
+      <section class="flex flex-col gap-4">
+        <fieldset class="fieldset">
+          <label for="part-input" class="label">Part ({{ gloss.language.toUpperCase() }})</label>
+          <input
+            id="part-input"
+            v-model="partDraft"
+            type="text"
+            class="input input-bordered w-full"
+            :placeholder="`Add part (${gloss.language.toUpperCase()})`"
+            list="part-suggestions"
+            @keyup.enter="addPart"
+          />
+          <datalist id="part-suggestions">
+            <option v-for="s in partSuggestions" :key="s.slug" :value="s.content" />
+          </datalist>
+        </fieldset>
+        <button class="btn self-start" :disabled="!partDraft.trim()" @click="addPart">Add part</button>
+        <fieldset class="fieldset">
+          <label for="parts-context" class="label">Context (optional)</label>
+          <input
+            id="parts-context"
+            v-model="partsContext"
+            type="text"
+            class="input input-bordered w-full"
+            placeholder="Context for AI suggestions"
+          />
+        </fieldset>
+        <button class="btn self-start" :disabled="aiParts || partsBlocked" @click="generateParts">
+          AI add parts
+        </button>
+        <button
+          class="btn btn-outline self-start"
+          :disabled="partsBlocked || hasParts"
+          @click="markUnsplittable"
+        >
+          Mark unsplittable
+        </button>
         <div class="flex flex-wrap gap-2">
           <span v-for="ref in gloss.parts || []" :key="ref" class="badge badge-outline gap-2">
             {{ renderRef(ref) }}
@@ -145,52 +136,45 @@
         </div>
       </section>
 
-      <!-- Usage examples -->
-      <section>
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-3">
-            <h3 class="font-semibold">Usage Examples</h3>
-            <span v-if="usageBlocked" class="badge badge-warning badge-outline text-xs">
-              marked impossible
-            </span>
-          </div>
-          <div class="flex gap-2">
-            <input
-              v-model="usageDraft"
-              type="text"
-              class="input input-bordered input-sm w-64"
-              placeholder="Add usage example"
-              list="usage-suggestions"
-              @keyup.enter="addUsage"
-            />
-            <datalist id="usage-suggestions">
-              <option v-for="s in usageSuggestions" :key="s.slug" :value="s.content" />
-            </datalist>
-            <button class="btn btn-sm" :disabled="!usageDraft.trim()" @click="addUsage">
-              Add
-            </button>
-            <button
-              class="btn btn-outline btn-sm"
-              :disabled="usageBlocked || hasUsage"
-              @click="markUsageImpossible"
-            >
-              Mark impossible
-            </button>
-            <input
-              v-model="usageContext"
-              type="text"
-              class="input input-bordered input-sm w-48"
-              placeholder="Context (optional)"
-            />
-            <button
-              class="btn btn-sm"
-              :disabled="aiUsage || usageBlocked"
-              @click="generateUsage"
-            >
-              AI add
-            </button>
-          </div>
-        </div>
+      <section class="flex flex-col gap-4">
+        <fieldset class="fieldset">
+          <label for="usage-input" class="label">Usage example</label>
+          <input
+            id="usage-input"
+            v-model="usageDraft"
+            type="text"
+            class="input input-bordered w-full"
+            placeholder="Add usage example"
+            list="usage-suggestions"
+            @keyup.enter="addUsage"
+          />
+          <datalist id="usage-suggestions">
+            <option v-for="s in usageSuggestions" :key="s.slug" :value="s.content" />
+          </datalist>
+        </fieldset>
+        <button class="btn self-start" :disabled="!usageDraft.trim()" @click="addUsage">
+          Add usage
+        </button>
+        <fieldset class="fieldset">
+          <label for="usage-context" class="label">Context (optional)</label>
+          <input
+            id="usage-context"
+            v-model="usageContext"
+            type="text"
+            class="input input-bordered w-full"
+            placeholder="Context for AI suggestions"
+          />
+        </fieldset>
+        <button class="btn self-start" :disabled="aiUsage || usageBlocked" @click="generateUsage">
+          AI add usage
+        </button>
+        <button
+          class="btn btn-outline self-start"
+          :disabled="usageBlocked || hasUsage"
+          @click="markUsageImpossible"
+        >
+          Mark usage impossible
+        </button>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="ref in gloss.usage_examples || []"
@@ -205,27 +189,25 @@
         </div>
       </section>
 
-      <!-- Children -->
-      <section>
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="font-semibold">Children</h3>
-          <div class="flex gap-2">
-            <input
-              v-model="childDraft"
-              type="text"
-              class="input input-bordered input-sm w-64"
-              placeholder="Add child gloss"
-              list="child-suggestions"
-              @keyup.enter="addChild"
-            />
-            <datalist id="child-suggestions">
-              <option v-for="s in childSuggestions" :key="s.slug" :value="s.content" />
-            </datalist>
-            <button class="btn btn-sm" :disabled="!childDraft.trim()" @click="addChild">
-              Add
-            </button>
-          </div>
-        </div>
+      <section class="flex flex-col gap-4">
+        <fieldset class="fieldset">
+          <label for="child-input" class="label">Child gloss</label>
+          <input
+            id="child-input"
+            v-model="childDraft"
+            type="text"
+            class="input input-bordered w-full"
+            placeholder="Add child gloss"
+            list="child-suggestions"
+            @keyup.enter="addChild"
+          />
+          <datalist id="child-suggestions">
+            <option v-for="s in childSuggestions" :key="s.slug" :value="s.content" />
+          </datalist>
+        </fieldset>
+        <button class="btn self-start" :disabled="!childDraft.trim()" @click="addChild">
+          Add child
+        </button>
         <div class="flex flex-wrap gap-2">
           <span v-for="ref in gloss.children || []" :key="ref" class="badge badge-outline gap-2">
             {{ renderRef(ref) }}
@@ -236,29 +218,26 @@
         </div>
       </section>
 
-      <!-- Notes -->
-      <section>
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-3">
-            <h3 class="font-semibold">Notes</h3>
-          </div>
-          <div class="flex gap-2 items-center">
-            <select v-model="noteLang" class="select select-bordered select-sm w-28">
-              <option :value="nativeLanguage">Native ({{ nativeLanguage.toUpperCase() }})</option>
-              <option :value="targetLanguage">Target ({{ targetLanguage.toUpperCase() }})</option>
-            </select>
-            <input
-              v-model="noteDraft"
-              type="text"
-              class="input input-bordered input-sm w-64"
-              placeholder="Add note"
-              @keyup.enter="addNote"
-            />
-            <button class="btn btn-sm" :disabled="!noteDraft.trim()" @click="addNote">
-              Add
-            </button>
-          </div>
-        </div>
+      <section class="flex flex-col gap-4">
+        <fieldset class="fieldset">
+          <label for="note-language" class="label">Note language</label>
+          <select id="note-language" v-model="noteLang" class="select select-bordered w-full">
+            <option :value="nativeLanguage">Native ({{ nativeLanguage.toUpperCase() }})</option>
+            <option :value="targetLanguage">Target ({{ targetLanguage.toUpperCase() }})</option>
+          </select>
+        </fieldset>
+        <fieldset class="fieldset">
+          <label for="note-input" class="label">Note</label>
+          <input
+            id="note-input"
+            v-model="noteDraft"
+            type="text"
+            class="input input-bordered w-full"
+            placeholder="Add note"
+            @keyup.enter="addNote"
+          />
+        </fieldset>
+        <button class="btn self-start" :disabled="!noteDraft.trim()" @click="addNote">Add note</button>
         <div class="flex flex-wrap gap-2">
           <span v-for="ref in gloss.notes || []" :key="ref" class="badge badge-outline gap-2">
             {{ renderRef(ref) }}
@@ -272,39 +251,39 @@
         </div>
       </section>
 
-      <!-- Transcriptions -->
-      <section>
-        <h3 class="font-semibold mb-2">Transcriptions</h3>
-        <div class="space-y-2">
-          <div v-for="(val, key) in transcriptions" :key="key" class="flex gap-2">
-            <input v-model="transcriptionKeys[key]" class="input input-sm input-bordered w-32" />
-            <input v-model="transcriptions[key]" class="input input-sm input-bordered flex-1" />
-            <button class="btn btn-ghost btn-xs" @click="removeTranscription(key)">
-              <X class="w-4 h-4" />
-            </button>
-          </div>
-          <div class="flex gap-2">
-            <input v-model="newTranscriptionKey" class="input input-sm input-bordered w-32" />
-            <input v-model="newTranscriptionVal" class="input input-sm input-bordered flex-1" />
-            <button
-              class="btn btn-sm"
-              :disabled="!newTranscriptionKey.trim() || !newTranscriptionVal.trim()"
-              @click="addTranscription"
+      <section class="flex flex-col gap-4">
+        <fieldset class="fieldset">
+          <label class="label">Transcriptions</label>
+          <div class="flex flex-col gap-2">
+            <div
+              v-for="(val, key) in transcriptions"
+              :key="key"
+              class="flex flex-wrap items-center gap-2"
             >
-              Add
-            </button>
+              <input v-model="transcriptionKeys[key]" class="input input-bordered w-28 md:w-32" />
+              <input v-model="transcriptions[key]" class="input input-bordered flex-1 min-w-[12rem]" />
+              <button class="btn btn-outline btn-xs" @click="removeTranscription(key)">
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <input v-model="newTranscriptionKey" class="input input-bordered w-28 md:w-32" />
+              <input v-model="newTranscriptionVal" class="input input-bordered flex-1 min-w-[12rem]" />
+              <button
+                class="btn"
+                :disabled="!newTranscriptionKey.trim() || !newTranscriptionVal.trim()"
+                @click="addTranscription"
+              >
+                Add transcription
+              </button>
+            </div>
           </div>
-        </div>
+        </fieldset>
       </section>
 
-      <!-- Danger zone -->
-      <div class="flex justify-between items-center border-t pt-4">
-        <div class="text-sm text-base-content/70">
-          Deleting will remove this gloss and clean references.
-        </div>
-        <button class="btn btn-error" @click="deleteGloss">
-          Delete Gloss
-        </button>
+      <div class="flex flex-col gap-2 border-t pt-4">
+        <div class="text-light">Deleting will remove this gloss and clean references.</div>
+        <button class="btn btn-error self-start" @click="deleteGloss">Delete Gloss</button>
       </div>
     </div>
 
