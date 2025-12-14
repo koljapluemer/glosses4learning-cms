@@ -43,7 +43,7 @@ export type ElectronAPI = {
       glossRef: string,
       nativeLanguage: string,
       targetLanguage: string
-    ) => Promise<{ state: 'red' | 'yellow' | 'green'; log: string }>
+    ) => Promise<{ state: 'red' | 'yellow'; log: string }>
   }
   language: {
     list: () => Promise<Language[]>

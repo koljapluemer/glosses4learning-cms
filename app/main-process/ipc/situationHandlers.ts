@@ -57,10 +57,8 @@ function gatherRefs(root: TreeNode): { refs: string[]; learn: string[] } {
   const refs: string[] = []
   const learn: string[] = []
   const seen = new Set<string>()
-  const skipParts = root.goal_type === 'procedural'
 
   function walk(node: TreeNode) {
-    if (skipParts && (node.role === 'part' || node.role === 'usage_part')) return
     const ref = nodeRef(node.gloss)
     if (!seen.has(ref)) {
       seen.add(ref)
@@ -138,9 +136,9 @@ function performBatchExport(): SituationExportResult {
 
           for (const root of nodes) {
             const state = (root.state || '').toLowerCase()
-            if (state !== 'yellow' && state !== 'green') continue
+            if (state !== 'yellow') continue
             const goalType = root.goal_type
-            if (goalType !== 'procedural' && goalType !== 'understand') continue
+            if (goalType !== 'procedural' && goalType !== 'understanding') continue
 
             const { refs, learn } = gatherRefs(root)
             refs.forEach((r) => allRefs.add(r))

@@ -59,8 +59,7 @@
                 class="badge badge-xs"
                 :class="{
                   'badge-error': goal.state === 'red',
-                  'badge-warning': goal.state === 'yellow',
-                  'badge-success': goal.state === 'green'
+                  'badge-warning': goal.state === 'yellow'
                 }"
               >
                 {{ goal.state.toUpperCase() }}
@@ -102,8 +101,7 @@
                 class="badge"
                 :class="{
                   'badge-error': activeGoalState === 'red',
-                  'badge-warning': activeGoalState === 'yellow',
-                  'badge-success': activeGoalState === 'green'
+                  'badge-warning': activeGoalState === 'yellow'
                 }"
               >
                 {{ activeGoalState?.toUpperCase() }}
@@ -175,7 +173,7 @@ interface Goal {
   id: string
   title: string
   type: 'procedural' | 'understanding'
-  state: 'red' | 'yellow' | 'green'
+  state: 'red' | 'yellow'
 }
 
 const route = useRoute()

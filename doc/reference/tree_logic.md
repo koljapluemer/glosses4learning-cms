@@ -25,7 +25,6 @@ Generally, to prevent infinite recursion:
 A goal can have 3 implicit quality states:
 - `RED`: stump goals, insufficient data to practice, will not be exported when exporting a situation
 - `YELLOW`: ok for practice, will be exported, should be improved if possible
-- `GREEN`: nice!
 
 Per default, a goal is considered `RED`.
 This state is specifically not to be calculated for a goal as a whole, but for a specific goal-target_lang-native_lang combination
@@ -39,33 +38,31 @@ The specific logic for how to define the implicit state is described below
 - for the root goal (which must be in target lang), show its translations (into the native lang)
     - It should have translations; otherwise warn (& add to missing translation flow)
         - we do not show or care about any relationships of these translations, they are *not* resolved in any way
-- for the root goal, *recursively* show its parts (so including `parts` of `parts` if they exist)
-    - it should have parts (or have been checked for them)
-        - each of these parts (at any depth) should:
-            - have a translation (...or have been checked for them)
-            - have usageExamples (...or haven been checked for them)
-                - each of these usage examples should have translations (...or have been checked for them)
-                - we do *not* show or care about the usage examples parts
-- we do *not* show or care about the parent goals `usageExamples`
+- for the root goal, we do a *standard parts recursion* (see below)
+
+- we do *not* show or care about the core goal's `usageExamples`
 
 - any kind of violated "should" results in the goal being `RED` instead of `YELLOW`:
     - no root goal translations
     - any resolved recursive `parts` child of the root goal (resolved as described above) lacking `translations`, `usageExamples` or `parts` (OR the needed check in `log` that this child relationship has been checked and set to be invalid)
-- a goal of this kind is also `GREEN` if everything above is fulfilled
 
 ### procedural-paraphrase-expression-goal
 
 
 - for the root goal (must be native lang and have tag "eng:paraphrase"), we should have translations into the target language that are *not* tagged "eng:paraphrase" (otherwise `RED`)
-    - each of these translations should recursively resolved into `parts` (or checked) [xxx]
-        - at any level of this recursion, gloss should have `translations` (or checked for them)
-        - at any level of this recursion, gloss should have `usageExamples` *if they are in the target language* (or checked)
-        - note that we're not resolving either the `usageExamples` nor the `parts` of native expressions, just `translations`
+    - for each of these *translations*, do the *standard parts recursion*
 - the root goal *should be checked for `parts`* (otherwise goal is `RED`), but it's ok if it has none, this will often happen
-    - *if* it has parts, each of these glosses should fulfill the same condition as the translations marked "[xxx]" above (same for their recursive children) 
+    - *if* it has parts, we do the *standard parts recursion* 
 
-- a goal of this kind is also `GREEN` if everything above is fulfilled
+### Standard Parts Recursion
 
+- root node should have parts (or have been checked for them)
+    - each of these parts (at any depth) should:
+        - have a translation (...or have been checked for them)
+        - have parts (...or checked)
+        - have usageExamples (...or checked) *if they are target language expressions* (if they are native, neither check for nor resolve `usageExamples`)
+            - each of these usage examples should have translations (...or have been checked for them)
+            - we do *not* show or care about the usage example's `parts`
 
 ## Remarks
 

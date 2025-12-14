@@ -21,8 +21,7 @@
             <td>
               <span class="badge badge-sm" :class="{
                 'badge-error': goal.state === 'red',
-                'badge-warning': goal.state === 'yellow',
-                'badge-success': goal.state === 'green'
+                'badge-warning': goal.state === 'yellow'
               }">
                 {{ goal.state?.toUpperCase() || 'PENDING' }}
               </span>
@@ -139,7 +138,7 @@ interface Goal {
   id: string
   title: string
   type?: 'understanding' | 'procedural'
-  state?: 'red' | 'yellow' | 'green'
+  state?: 'red' | 'yellow'
 }
 
 const props = defineProps<{

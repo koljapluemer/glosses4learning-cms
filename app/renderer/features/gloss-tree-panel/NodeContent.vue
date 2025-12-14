@@ -3,14 +3,13 @@
     <!-- Marker badge (PROC/UNDR/USG) -->
     <span v-if="node.marker" class="badge badge-outline">{{ node.marker }}</span>
 
-    <!-- State badge (RED/YELLOW/GREEN) only on root -->
+    <!-- State badge (RED/YELLOW) only on root -->
     <span
       v-if="node.state"
       class="badge uppercase"
       :class="{
         'badge-error': node.state === 'red',
-        'badge-warning': node.state === 'yellow',
-        'badge-success': node.state === 'green'
+        'badge-warning': node.state === 'yellow'
       }"
     >
       {{ node.state }}

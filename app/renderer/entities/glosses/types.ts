@@ -33,7 +33,7 @@ export interface UsageInfo {
 }
 
 export type GoalType = 'procedural' | 'understanding'
-export type GoalState = 'red' | 'yellow' | 'green'
+export type GoalState = 'red' | 'yellow'
 
 export interface TreeNode {
   gloss: Gloss
