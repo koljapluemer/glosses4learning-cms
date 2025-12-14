@@ -84,6 +84,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ExternalLink, Unlink, Trash2, Edit } from 'lucide-vue-next'
+import { useToasts } from '../../features/toast-center/useToasts'
 
 interface Situation {
   slug: string
@@ -98,28 +99,97 @@ interface Goal {
   state?: 'red' | 'yellow' | 'green'
 }
 
-defineProps<{
+const props = defineProps<{
   situation: Situation
   goals: Goal[]
+  nativeLanguage: string
+  targetLanguage: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   'add-goal': []
   'select-goal': [goalId: string]
+  'reload-goals': []
 }>()
 
+const { success, error } = useToasts()
 const proceduralInput = ref('')
 const understandingInput = ref('')
 
-function addProceduralGoal() {
-  if (!proceduralInput.value.trim()) return
-  // TODO: Create gloss in native language, tag with eng:procedural-paraphrase-expression-goal, attach to situation
-  proceduralInput.value = ''
+/**
+ * Add a procedural goal (native language paraphrase expression)
+ * Python ref: agent/tools/database/add_gloss_procedural.py:25-42
+ */
+async function addProceduralGoal() {
+  const content = proceduralInput.value.trim()
+  if (!content) return
+
+  try {
+    // 1. Create or find the gloss in native language
+    const gloss = await window.electronAPI.gloss.ensure(props.nativeLanguage, content)
+
+    // 2. Ensure tags are present
+    const tags = gloss.tags || []
+    let modified = false
+    if (!tags.includes('eng:paraphrase')) {
+      tags.push('eng:paraphrase')
+      modified = true
+    }
+    if (!tags.includes('eng:procedural-paraphrase-expression-goal')) {
+      tags.push('eng:procedural-paraphrase-expression-goal')
+      modified = true
+    }
+
+    if (modified) {
+      gloss.tags = tags
+      await window.electronAPI.gloss.save(gloss)
+    }
+
+    // 3. Attach to situation as child
+    const situationRef = `${props.situation.language}:${props.situation.slug}`
+    const goalRef = `${gloss.language}:${gloss.slug}`
+    await window.electronAPI.gloss.attachRelation(situationRef, 'children', goalRef)
+
+    success(`Added procedural goal: ${content}`)
+    proceduralInput.value = ''
+    emit('reload-goals')
+  } catch (err) {
+    error(`Failed to add procedural goal: ${err}`)
+    console.error(err)
+  }
 }
 
-function addUnderstandingGoal() {
-  if (!understandingInput.value.trim()) return
-  // TODO: Create gloss in target language, tag with eng:understand-expression-goal, attach to situation
-  understandingInput.value = ''
+/**
+ * Add an understanding goal (target language expression)
+ * Python ref: agent/tools/database/add_gloss_understanding.py:25-42
+ */
+async function addUnderstandingGoal() {
+  const content = understandingInput.value.trim()
+  if (!content) return
+
+  try {
+    // 1. Create or find the gloss in target language
+    const gloss = await window.electronAPI.gloss.ensure(props.targetLanguage, content)
+
+    // 2. Ensure tag is present
+    const tags = gloss.tags || []
+    if (!tags.includes('eng:understand-expression-goal')) {
+      tags.push('eng:understand-expression-goal')
+      gloss.tags = tags
+      await window.electronAPI.gloss.save(gloss)
+    }
+
+    // 3. Attach to situation as child
+    const situationRef = `${props.situation.language}:${props.situation.slug}`
+    const goalRef = `${gloss.language}:${gloss.slug}`
+    await window.electronAPI.gloss.attachRelation(situationRef, 'children', goalRef)
+
+    success(`Added understanding goal: ${content}`)
+    understandingInput.value = ''
+    emit('reload-goals')
+  } catch (err) {
+    error(`Failed to add understanding goal: ${err}`)
+    console.error(err)
+  }
 }
 </script>

@@ -49,8 +49,11 @@
           v-if="activeTab === 'overview'"
           :situation="situation"
           :goals="goals"
+          :native-language="nativeLang"
+          :target-language="targetLang"
           @add-goal="addGoal"
           @select-goal="selectGoal"
+          @reload-goals="reloadGoals"
         />
 
         <!-- Goal Tabs -->
@@ -157,25 +160,19 @@ async function loadGoals(sit: Situation): Promise<Goal[]> {
   const native = nativeLang.value
   const target = targetLang.value
 
-  console.log('Loading goals:', { childrenCount: children.length, native, target })
-
   if (!native || !target) {
-    console.log('Missing native or target language')
     return []
   }
 
   const goalPromises = children.map(async (ref) => {
     try {
       const gloss = await window.electronAPI.gloss.resolveRef(ref)
-      console.log('Loaded gloss:', { ref, language: gloss.language, tags: gloss.tags, content: gloss.content })
 
       // Detect goal type using language and tags
       const goalType = detectGoalType(gloss, native, target)
-      console.log('Detected goal type:', { ref, goalType, gloss })
 
       // Skip if not a valid goal for this native/target pair
       if (!goalType) {
-        console.log('Skipping - not a valid goal type for this language pair')
         return null
       }
 
@@ -195,9 +192,7 @@ async function loadGoals(sit: Situation): Promise<Goal[]> {
   })
 
   const results = await Promise.all(goalPromises)
-  const filtered = results.filter((g): g is Goal => g !== null)
-  console.log('Final goals loaded:', filtered)
-  return filtered
+  return results.filter((g): g is Goal => g !== null)
 }
 
 function addGoal() {
@@ -207,6 +202,18 @@ function addGoal() {
 
 function selectGoal(goalId: string) {
   activeTab.value = goalId
+}
+
+async function reloadGoals() {
+  // Reload the situation from disk to get updated children array
+  const situationLang = route.params.situationLang as string
+  const situationSlug = route.params.situationSlug as string
+
+  const freshSituation = await window.electronAPI.gloss.load(situationLang, situationSlug)
+  if (freshSituation) {
+    situation.value = freshSituation
+    goals.value = await loadGoals(freshSituation)
+  }
 }
 
 function changeSituation(newSituation: Situation) {
