@@ -76,6 +76,42 @@ function gatherRefs(root: TreeNode): { refs: string[]; learn: string[] } {
   return { refs, learn }
 }
 
+function cleanupOldExports(outputRoot: string, expectedFiles: Set<string>) {
+  if (!fs.existsSync(outputRoot)) return
+
+  for (const native of fs.readdirSync(outputRoot)) {
+    const nativeDir = path.join(outputRoot, native)
+    if (!fs.statSync(nativeDir).isDirectory()) continue
+
+    for (const target of fs.readdirSync(nativeDir)) {
+      const targetDir = path.join(nativeDir, target)
+      if (!fs.statSync(targetDir).isDirectory()) continue
+
+      for (const file of fs.readdirSync(targetDir)) {
+        const filePath = path.join(targetDir, file)
+        const stat = fs.statSync(filePath)
+        if (stat.isDirectory()) continue
+
+        const lower = file.toLowerCase()
+        const isExportFile = lower.endsWith('.json') || lower.endsWith('.jsonl')
+        if (!isExportFile) continue
+
+        if (!expectedFiles.has(filePath)) {
+          fs.unlinkSync(filePath)
+        }
+      }
+
+      if (fs.existsSync(targetDir) && fs.readdirSync(targetDir).length === 0) {
+        fs.rmdirSync(targetDir)
+      }
+    }
+
+    if (fs.existsSync(nativeDir) && fs.statSync(nativeDir).isDirectory() && fs.readdirSync(nativeDir).length === 0) {
+      fs.rmdirSync(nativeDir)
+    }
+  }
+}
+
 function performBatchExport(): SituationExportResult {
   const outputRoot = situationsRoot
   const result: SituationExportResult = {
@@ -89,6 +125,7 @@ function performBatchExport(): SituationExportResult {
   }
 
   try {
+    const exportedFiles = new Set<string>()
     const situations: Gloss[] = []
     for (const gloss of storage.findGlossesByTag('eng:situation')) {
       situations.push(gloss)
@@ -189,6 +226,8 @@ function performBatchExport(): SituationExportResult {
 
           fs.writeFileSync(situationJsonPath, JSON.stringify(exportObj, null, 2), 'utf-8')
           fs.writeFileSync(glossesJsonlPath, jsonlLines.join('\n'), 'utf-8')
+          exportedFiles.add(situationJsonPath)
+          exportedFiles.add(glossesJsonlPath)
 
           result.exports.push({
             situation: situationRef,
@@ -207,6 +246,7 @@ function performBatchExport(): SituationExportResult {
       }
     }
 
+    cleanupOldExports(outputRoot, exportedFiles)
     result.success = true
     return result
   } catch (err) {
