@@ -4,7 +4,9 @@
  */
 
 import { Agent, run } from '@openai/agents'
-import { OpenAIChatCompletionsModel, setDefaultOpenAIKey } from '@openai/agents-openai'
+import { OpenAIChatCompletionsModel } from '@openai/agents-openai'
+import OpenAI from 'openai'
+import { logAi } from './aiLogger'
 
 const MODEL_NAME = 'gpt-4o-mini'
 const TEMPERATURE_CREATIVE = 0.7
@@ -19,21 +21,35 @@ interface GeneratedGoals {
   message: string
 }
 
-async function runJsonList(
-  apiKey: string,
-  prompt: string
-): Promise<string[]> {
-  setDefaultOpenAIKey(apiKey)
+async function runJsonList(apiKey: string, prompt: string): Promise<string[]> {
+  const started = performance.now()
+  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
   const agent = new Agent({
     name: 'goal-generator',
     instructions: 'Return ONLY JSON with a top-level "goals" array of strings. No prose.',
-    model: new OpenAIChatCompletionsModel({ model: MODEL_NAME, temperature: TEMPERATURE_CREATIVE })
+    model: new OpenAIChatCompletionsModel(client, MODEL_NAME),
+    modelSettings: { temperature: TEMPERATURE_CREATIVE }
   })
-  const result = await run(agent, prompt)
-  const content = (result.finalOutput ?? '').toString().trim() || '{}'
-  const parsed = JSON.parse(content)
-  const goals = (parsed.goals || []).filter((g: unknown) => typeof g === 'string' && g.trim())
-  return goals.map((g: string) => g.trim())
+  try {
+    const result = await run(agent, prompt)
+    const content = (result.finalOutput ?? '').toString().trim() || '{}'
+    const parsed = JSON.parse(content)
+    const goals = (parsed.goals || []).filter((g: unknown) => typeof g === 'string' && g.trim())
+    const normalized = goals.map((g: string) => g.trim())
+    await logAi('generateGoals.success', [], {
+      promptLength: prompt.length,
+      goalsCount: normalized.length,
+      durationMs: Math.round(performance.now() - started)
+    })
+    return normalized
+  } catch (err) {
+    await logAi('generateGoals.error', [], {
+      promptLength: prompt.length,
+      error: err instanceof Error ? err.message : String(err),
+      durationMs: Math.round(performance.now() - started)
+    })
+    throw err
+  }
 }
 
 /**

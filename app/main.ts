@@ -5,6 +5,7 @@ import { setupGlossHandlers } from './main-process/ipc/glossHandlers'
 import { setupLanguageHandlers } from './main-process/ipc/languageHandlers'
 import { setupSituationHandlers } from './main-process/ipc/situationHandlers'
 import { setupSettingsHandlers } from './main-process/ipc/settingsHandlers'
+import { setupAiLogHandlers } from './main-process/ipc/aiLogHandlers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -71,6 +72,7 @@ app.whenReady().then(() => {
   setupLanguageHandlers()
   setupSituationHandlers()
   setupSettingsHandlers()
+  setupAiLogHandlers()
 
   createWindow()
 })

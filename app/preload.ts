@@ -61,6 +61,9 @@ export type ElectronAPI = {
     get: <T>(key: string) => Promise<T | undefined>
     set: (key: string, value: unknown) => Promise<void>
   }
+  aiLog: {
+    write: (entry: { action: string; refs?: string[]; payload?: Record<string, unknown> }) => Promise<void>
+  }
 }
 
 // Expose protected methods that allow the renderer process to use
@@ -110,6 +113,9 @@ const api: ElectronAPI = {
   settings: {
     get: (key) => ipcRenderer.invoke('settings:get', key),
     set: (key, value) => ipcRenderer.invoke('settings:set', key, value)
+  },
+  aiLog: {
+    write: (entry) => ipcRenderer.invoke('ai-log:write', entry)
   }
 }
 

@@ -305,7 +305,11 @@ import ModalShell from '../../dumb/ModalShell.vue'
 import { useToasts } from '../toast-center/useToasts'
 import type { Gloss } from '../../../main-process/storage/types'
 import type { RelationshipField } from '../../entities/glosses/relationRules'
-import { generateTranslations, generateParts as aiPartsGen, generateUsage as aiUsageGen } from '../ai-batch-tools/useAiGeneration'
+import {
+  generateTranslations as aiTranslationsGen,
+  generateParts as aiPartsGen,
+  generateUsage as aiUsageGen
+} from '../ai-batch-tools/useAiGeneration'
 import { useSettings } from '../../entities/system/settingsStore'
 import GoalConfirmModal from '../goal-confirm-modal/GoalConfirmModal.vue'
 import { paraphraseDisplay } from '../../entities/glosses/goalState'
@@ -565,7 +569,7 @@ async function generateTranslations() {
   }
   aiTranslating.value = true
   try {
-    const res = await generateTranslations(
+    const res = await aiTranslationsGen(
       apiKey,
       gloss.value.language === props.nativeLanguage ? 'toTarget' : 'toNative',
       [`${gloss.value.language}:${gloss.value.slug}`],

@@ -1,7 +1,9 @@
 import { Agent, run } from '@openai/agents'
-import { OpenAIChatCompletionsModel, setDefaultOpenAIKey } from '@openai/agents-openai'
+import { OpenAIChatCompletionsModel } from '@openai/agents-openai'
+import OpenAI from 'openai'
 import type { Gloss } from '../../../main-process/storage/types'
 import { loadLanguages } from '../../entities/languages/loader'
+import { logAi } from '../../entities/ai/aiLogger'
 
 const MODEL = 'gpt-4o-mini'
 const TEMP_TRANSLATION = 0.2
@@ -96,6 +98,8 @@ Break expressions into learnable component parts - words or meaningful sub-expre
 
 Take each expression below and break it up into parts that can be learned on their own.
 
+Aim for ${count} high-value parts per expression (fewer if natural).
+
 Return JSON with 'parts' array for each source.
 
 Items:
@@ -152,11 +156,12 @@ Return JSON { "items": [ { "source": "<content>", "ok": true/false } ] }`
 }
 
 async function runJsonAgent(apiKey: string, prompt: string, temperature: number): Promise<string> {
-  setDefaultOpenAIKey(apiKey)
+  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
   const agent = new Agent({
     name: 'json-runner',
     instructions: 'Return ONLY valid JSON matching the user request. No prose.',
-    model: new OpenAIChatCompletionsModel({ model: MODEL, temperature })
+    model: new OpenAIChatCompletionsModel(client, MODEL),
+    modelSettings: { temperature }
   })
   const result = await run(agent, prompt)
   return (result.finalOutput ?? '').toString().trim()
@@ -189,7 +194,7 @@ async function runCompletion(
     }
     map.set(source, vals)
   }
-  return map as Record<string, string[]>
+  return Object.fromEntries(map)
 }
 
 async function runJudge(apiKey: string, prompt: string): Promise<Set<string>> {
@@ -237,16 +242,40 @@ export async function generateTranslations(
   target: string,
   options?: GenerationOptions
 ): Promise<Suggestion[]> {
+  const started = performance.now()
   if (!refs.length) return []
-  const glosses = await fetchGlosses(refs.slice(0, 25))
-  if (!glosses.length) return []
-  const note =
-    mode === 'toNative'
-      ? await getAiNote(native)
-      : await getAiNote(target)
-  const prompt = translationPrompt(mode, glosses, native, target, note, options)
-  const bag = await runCompletion(apiKey, prompt, TEMP_TRANSLATION)
-  return mapSuggestions(glosses, bag)
+  try {
+    const glosses = await fetchGlosses(refs.slice(0, 25))
+    if (!glosses.length) return []
+    const note =
+      mode === 'toNative'
+        ? await getAiNote(native)
+        : await getAiNote(target)
+    const prompt = translationPrompt(mode, glosses, native, target, note, options)
+    const bag = await runCompletion(apiKey, prompt, TEMP_TRANSLATION)
+    const suggestions = mapSuggestions(glosses, bag)
+    const suggestionDetails = suggestions.map((s) => ({
+      ref: s.glossRef,
+      count: s.suggestions.length,
+      suggestions: s.suggestions
+    }))
+    await logAi('generateTranslations', refs, {
+      mode,
+      promptLength: prompt.length,
+      suggestionSets: suggestions.length,
+      totalSuggestions: suggestions.reduce((acc, s) => acc + s.suggestions.length, 0),
+      suggestions: suggestionDetails,
+      durationMs: Math.round(performance.now() - started)
+    })
+    return suggestions
+  } catch (err) {
+    await logAi('generateTranslationsError', refs, {
+      mode,
+      error: err instanceof Error ? err.message : String(err),
+      durationMs: Math.round(performance.now() - started)
+    })
+    throw err
+  }
 }
 
 export async function generateParts(
@@ -254,23 +283,52 @@ export async function generateParts(
   refs: string[],
   options?: GenerationOptions
 ): Promise<Suggestion[]> {
+  const started = performance.now()
   if (!refs.length) return []
-  const glosses = await fetchGlosses(refs.slice(0, 20))
-  if (!glosses.length) return []
-  const judgeOk = await runJudge(apiKey, splitJudgePrompt(glosses))
-  const rejected = glosses.filter((g) => !judgeOk.has(g.content))
-  for (const gloss of rejected) {
-    await window.electronAPI.gloss.markLog(
-      `${gloss.language}:${gloss.slug}`,
-      'SPLIT_CONSIDERED_UNNECESSARY'
-    )
+  try {
+    const glosses = await fetchGlosses(refs.slice(0, 20))
+    if (!glosses.length) return []
+    const judgeOk = await runJudge(apiKey, splitJudgePrompt(glosses))
+    const rejected = glosses.filter((g) => !judgeOk.has(g.content))
+    await logAi('generateParts.judge', refs, {
+      okRefs: glosses.filter((g) => judgeOk.has(g.content)).map((g) => `${g.language}:${g.slug}`),
+      rejectedRefs: rejected.map((g) => `${g.language}:${g.slug}`),
+      durationMs: Math.round(performance.now() - started)
+    })
+    for (const gloss of rejected) {
+      await window.electronAPI.gloss.markLog(
+        `${gloss.language}:${gloss.slug}`,
+        'SPLIT_CONSIDERED_UNNECESSARY'
+      )
+    }
+    const filtered = glosses.filter((g) => judgeOk.has(g.content))
+    if (!filtered.length) return []
+    const aiNote = await getAiNote(filtered[0].language)
+    const prompt = partsPrompt(filtered, aiNote, options)
+    const bag = await runCompletion(apiKey, prompt, TEMP_GENERATION)
+    const suggestions = mapSuggestions(filtered, bag)
+    const suggestionDetails = suggestions.map((s) => ({
+      ref: s.glossRef,
+      count: s.suggestions.length,
+      suggestions: s.suggestions
+    }))
+    await logAi('generateParts', refs, {
+      judgedOk: filtered.length,
+      rejected: rejected.length,
+      promptLength: prompt.length,
+      suggestionSets: suggestions.length,
+      totalSuggestions: suggestions.reduce((acc, s) => acc + s.suggestions.length, 0),
+      suggestions: suggestionDetails,
+      durationMs: Math.round(performance.now() - started)
+    })
+    return suggestions
+  } catch (err) {
+    await logAi('generatePartsError', refs, {
+      error: err instanceof Error ? err.message : String(err),
+      durationMs: Math.round(performance.now() - started)
+    })
+    throw err
   }
-  const filtered = glosses.filter((g) => judgeOk.has(g.content))
-  if (!filtered.length) return []
-  const aiNote = await getAiNote(filtered[0].language)
-  const prompt = partsPrompt(filtered, aiNote, options)
-  const bag = await runCompletion(apiKey, prompt, TEMP_GENERATION)
-  return mapSuggestions(filtered, bag)
 }
 
 export async function generateUsage(
@@ -278,21 +336,50 @@ export async function generateUsage(
   refs: string[],
   options?: GenerationOptions
 ): Promise<Suggestion[]> {
+  const started = performance.now()
   if (!refs.length) return []
-  const glosses = await fetchGlosses(refs.slice(0, 20))
-  if (!glosses.length) return []
-  const judgeOk = await runJudge(apiKey, usageJudgePrompt(glosses))
-  const rejected = glosses.filter((g) => !judgeOk.has(g.content))
-  for (const gloss of rejected) {
-    await window.electronAPI.gloss.markLog(
-      `${gloss.language}:${gloss.slug}`,
-      `USAGE_EXAMPLE_CONSIDERED_IMPOSSIBLE:${gloss.language}`
-    )
+  try {
+    const glosses = await fetchGlosses(refs.slice(0, 20))
+    if (!glosses.length) return []
+    const judgeOk = await runJudge(apiKey, usageJudgePrompt(glosses))
+    const rejected = glosses.filter((g) => !judgeOk.has(g.content))
+    await logAi('generateUsage.judge', refs, {
+      okRefs: glosses.filter((g) => judgeOk.has(g.content)).map((g) => `${g.language}:${g.slug}`),
+      rejectedRefs: rejected.map((g) => `${g.language}:${g.slug}`),
+      durationMs: Math.round(performance.now() - started)
+    })
+    for (const gloss of rejected) {
+      await window.electronAPI.gloss.markLog(
+        `${gloss.language}:${gloss.slug}`,
+        `USAGE_EXAMPLE_CONSIDERED_IMPOSSIBLE:${gloss.language}`
+      )
+    }
+    const filtered = glosses.filter((g) => judgeOk.has(g.content))
+    if (!filtered.length) return []
+    const aiNote = await getAiNote(filtered[0].language)
+    const prompt = usagePrompt(filtered, aiNote, options)
+    const bag = await runCompletion(apiKey, prompt, TEMP_GENERATION)
+    const suggestions = mapSuggestions(filtered, bag)
+    const suggestionDetails = suggestions.map((s) => ({
+      ref: s.glossRef,
+      count: s.suggestions.length,
+      suggestions: s.suggestions
+    }))
+    await logAi('generateUsage', refs, {
+      judgedOk: filtered.length,
+      rejected: rejected.length,
+      promptLength: prompt.length,
+      suggestionSets: suggestions.length,
+      totalSuggestions: suggestions.reduce((acc, s) => acc + s.suggestions.length, 0),
+      suggestions: suggestionDetails,
+      durationMs: Math.round(performance.now() - started)
+    })
+    return suggestions
+  } catch (err) {
+    await logAi('generateUsageError', refs, {
+      error: err instanceof Error ? err.message : String(err),
+      durationMs: Math.round(performance.now() - started)
+    })
+    throw err
   }
-  const filtered = glosses.filter((g) => judgeOk.has(g.content))
-  if (!filtered.length) return []
-  const aiNote = await getAiNote(filtered[0].language)
-  const prompt = usagePrompt(filtered, aiNote, options)
-  const bag = await runCompletion(apiKey, prompt, TEMP_GENERATION)
-  return mapSuggestions(filtered, bag)
 }
