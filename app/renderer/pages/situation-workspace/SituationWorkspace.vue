@@ -106,6 +106,15 @@
               >
                 {{ activeGoalState?.toUpperCase() }}
               </span>
+              <button
+                v-if="activeGoalState === 'red'"
+                class="btn btn-ghost btn-xs"
+                title="Show missing requirements"
+                :disabled="stateLogLoading"
+                @click="openStateLog"
+              >
+                <Info class="w-4 h-4" />
+              </button>
             </div>
 
             <div v-if="treeLoading" class="flex justify-center py-8">
@@ -139,22 +148,36 @@
     </div>
 
     <!-- Gloss modal lives at root so it can be opened from anywhere -->
-    <GlossModal
-      :open="glossModalOpen"
-      :gloss-ref="activeGlossRef"
-      :native-language="nativeLang"
-      :target-language="targetLang"
-      @close="glossModalOpen = false"
-      @saved="handleGlossSaved"
-      @deleted="handleGlossDeleted"
-    />
+<GlossModal
+  :open="glossModalOpen"
+  :gloss-ref="activeGlossRef"
+  :native-language="nativeLang"
+  :target-language="targetLang"
+  @close="glossModalOpen = false"
+  @saved="handleGlossSaved"
+  @deleted="handleGlossDeleted"
+/>
+
+<!-- Goal state log modal -->
+<dialog :open="showStateLog" class="modal">
+  <div class="modal-box max-w-3xl">
+    <h3 class="font-semibold text-lg mb-3">Goal requirements</h3>
+    <pre class="whitespace-pre-wrap text-sm bg-base-200 p-3 rounded">{{ stateLog }}</pre>
+    <div class="modal-action">
+      <button class="btn" @click="showStateLog = false">Close</button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop" @submit="showStateLog = false">
+    <button>close</button>
+  </form>
+</dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Home, List, Settings } from 'lucide-vue-next'
+import { Home, List, Settings, Info } from 'lucide-vue-next'
 import OverviewTab from './OverviewTab.vue'
 import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
 import SettingsModal from '../../features/settings-modal/SettingsModal.vue'
@@ -193,6 +216,9 @@ const treeNodes = ref<TreeNode[]>([])
 const treeStats = ref<TreeStats | null>(null)
 const glossModalOpen = ref(false)
 const activeGlossRef = ref<string | null>(null)
+const showStateLog = ref(false)
+const stateLog = ref('')
+const stateLogLoading = ref(false)
 
 // Extract language params from route
 const nativeLang = computed(() => route.params.nativeLang as string)
@@ -613,6 +639,25 @@ async function handleGlossDeleted(ref?: string) {
     await refreshTree(situation.value)
   }
   glossModalOpen.value = false
+}
+
+async function openStateLog() {
+  if (!activeGoalRef.value) return
+  stateLogLoading.value = true
+  try {
+    const result = await window.electronAPI.gloss.evaluateGoalState(
+      activeGoalRef.value,
+      nativeLang.value,
+      targetLang.value
+    )
+    stateLog.value = result.log
+    showStateLog.value = true
+  } catch (err) {
+    console.error('Failed to load goal log', err)
+    error('Could not load goal state details')
+  } finally {
+    stateLogLoading.value = false
+  }
 }
 
 // Watch for route changes to reload situation
