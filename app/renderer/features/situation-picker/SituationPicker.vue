@@ -67,6 +67,13 @@
               <!-- Action buttons -->
               <button
                 class="btn btn-ghost btn-xs"
+                title="Open gloss"
+                @click="emit('open-gloss', situation)"
+              >
+                <ExternalLink class="w-4 h-4" />
+              </button>
+              <button
+                class="btn btn-ghost btn-xs"
                 title="Remove situation tag"
                 @click="removeSituationTag(situation)"
               >
@@ -103,7 +110,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Plus, Trash2, X } from 'lucide-vue-next'
+import { Plus, Trash2, X, ExternalLink } from 'lucide-vue-next'
 import ModalShell from '../../dumb/ModalShell.vue'
 import InlineAddField from '../../dumb/InlineAddField.vue'
 import { useToasts } from '../toast-center/useToasts'
@@ -130,6 +137,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   select: [situation: Situation]
+  'open-gloss': [situation: Situation]
 }>()
 
 const { success, error } = useToasts()
@@ -195,7 +203,8 @@ async function createSituation(content: string) {
   try {
     const newSituation = await window.electronAPI.situation.create(content)
     situations.value.unshift(newSituation)
-    showCreateField.value = false
+    // Keep field open for rapid successive adds
+    showCreateField.value = true
     success('Situation created')
   } catch (err) {
     error('Failed to create situation')

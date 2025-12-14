@@ -1,9 +1,10 @@
 /**
- * AI-powered goal generation using OpenAI
+ * AI-powered goal generation using @openai/agents
  * Ports from agent/tools/llm/generate_*_goals.py
  */
 
-import OpenAI from 'openai'
+import { Agent, run } from '@openai/agents'
+import { OpenAIChatCompletionsModel, setDefaultOpenAIKey } from '@openai/agents-openai'
 
 const MODEL_NAME = 'gpt-4o-mini'
 const TEMPERATURE_CREATIVE = 0.7
@@ -12,6 +13,23 @@ interface GeneratedGoals {
   goals: string[]
   count: number
   message: string
+}
+
+async function runJsonList(
+  apiKey: string,
+  prompt: string
+): Promise<string[]> {
+  setDefaultOpenAIKey(apiKey)
+  const agent = new Agent({
+    name: 'goal-generator',
+    instructions: 'Return ONLY JSON with a top-level "goals" array of strings. No prose.',
+    model: new OpenAIChatCompletionsModel({ model: MODEL_NAME, temperature: TEMPERATURE_CREATIVE })
+  })
+  const result = await run(agent, prompt)
+  const content = (result.finalOutput ?? '').toString().trim() || '{}'
+  const parsed = JSON.parse(content)
+  const goals = (parsed.goals || []).filter((g: unknown) => typeof g === 'string' && g.trim())
+  return goals.map((g: string) => g.trim())
 }
 
 /**
@@ -25,10 +43,6 @@ export async function generateUnderstandingGoals(
   numGoals: number = 5,
   extraContext: string = ''
 ): Promise<GeneratedGoals> {
-  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
-
-  const systemPrompt = 'You create expressions in the target language that a learner needs to understand in various situations.'
-
   const contextText = extraContext ? `Additional context: ${extraContext}` : ''
   const userPrompt = `Generate ${numGoals} expressions in ${targetLanguage} for the situation: "${situationContent}".
 
@@ -48,37 +62,7 @@ ${contextText}
 
 Return JSON with a 'goals' array of strings.`
 
-  const response = await client.chat.completions.create({
-    model: MODEL_NAME,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ],
-    temperature: TEMPERATURE_CREATIVE,
-    max_tokens: 500,
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'goal_list',
-        schema: {
-          type: 'object',
-          properties: {
-            goals: {
-              type: 'array',
-              items: { type: 'string' }
-            }
-          },
-          required: ['goals'],
-          additionalProperties: false
-        },
-        strict: true
-      }
-    }
-  })
-
-  const content = response.choices[0]?.message?.content?.trim() || '{}'
-  const parsed = JSON.parse(content)
-  const goals = (parsed.goals || []).filter((g: unknown) => typeof g === 'string' && g.trim()).map((g: string) => g.trim())
+  const goals = await runJsonList(apiKey, userPrompt)
 
   return {
     goals,
@@ -99,10 +83,6 @@ export async function generateProceduralGoals(
   numGoals: number = 5,
   extraContext: string = ''
 ): Promise<GeneratedGoals> {
-  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
-
-  const systemPrompt = 'You create practical expression goals a learner wants to express in the native language.'
-
   const contextText = extraContext ? `Additional context: ${extraContext}` : ''
   const userPrompt = `Generate ${numGoals} paraphrased expressions in ${nativeLanguage} for the situation: "${situationContent}".
 
@@ -117,37 +97,7 @@ ${contextText}
 
 Return JSON with a 'goals' array of strings.`
 
-  const response = await client.chat.completions.create({
-    model: MODEL_NAME,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ],
-    temperature: TEMPERATURE_CREATIVE,
-    max_tokens: 500,
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'goal_list',
-        schema: {
-          type: 'object',
-          properties: {
-            goals: {
-              type: 'array',
-              items: { type: 'string' }
-            }
-          },
-          required: ['goals'],
-          additionalProperties: false
-        },
-        strict: true
-      }
-    }
-  })
-
-  const content = response.choices[0]?.message?.content?.trim() || '{}'
-  const parsed = JSON.parse(content)
-  const goals = (parsed.goals || []).filter((g: unknown) => typeof g === 'string' && g.trim()).map((g: string) => g.trim())
+  const goals = await runJsonList(apiKey, userPrompt)
 
   return {
     goals,

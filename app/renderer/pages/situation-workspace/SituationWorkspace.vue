@@ -18,6 +18,7 @@
       :open="showSituationPicker"
       @close="showSituationPicker = false"
       @select="changeSituation"
+      @open-gloss="openSituationGloss"
     />
 
     <!-- Settings Modal -->
@@ -131,20 +132,21 @@
               :missing-usage-refs="goalStats.missingUsage"
               @applied="handleGlossSaved"
             />
-
-            <GlossModal
-              :open="glossModalOpen"
-              :gloss-ref="activeGlossRef"
-              :native-language="nativeLang"
-              :target-language="targetLang"
-              @close="glossModalOpen = false"
-              @saved="handleGlossSaved"
-              @deleted="handleGlossDeleted"
-            />
           </div>
         </template>
       </div>
     </div>
+
+    <!-- Gloss modal lives at root so it can be opened from anywhere -->
+    <GlossModal
+      :open="glossModalOpen"
+      :gloss-ref="activeGlossRef"
+      :native-language="nativeLang"
+      :target-language="targetLang"
+      @close="glossModalOpen = false"
+      @saved="handleGlossSaved"
+      @deleted="handleGlossDeleted"
+    />
   </div>
 </template>
 
@@ -363,6 +365,11 @@ function changeSituation(newSituation: Gloss) {
   })
 }
 
+function openSituationGloss(situation: Gloss) {
+  activeGlossRef.value = `${situation.language}:${situation.slug}`
+  glossModalOpen.value = true
+}
+
 async function saveApiKey(apiKey: string) {
   try {
     await setOpenAIApiKey(apiKey)
@@ -410,7 +417,7 @@ function mapGoalsFromNodes(nodes: TreeNode[]): Goal[] {
     .filter((node) => node.goal_type)
     .map((node) => ({
       id: `${node.gloss.language}:${node.gloss.slug}`,
-      title: node.gloss.content,
+      title: node.display,
       type: node.goal_type === 'procedural' ? 'procedural' : 'understanding',
       state: node.state || 'red'
     }))

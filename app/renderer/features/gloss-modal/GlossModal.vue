@@ -60,6 +60,12 @@
             >
               Mark impossible
             </button>
+            <input
+              v-model="translationContext"
+              type="text"
+              class="input input-bordered input-sm w-48"
+              placeholder="Context (optional)"
+            />
             <button
               class="btn btn-sm"
               :disabled="aiTranslating || translationBlocked"
@@ -114,6 +120,12 @@
             >
               Mark unsplittable
             </button>
+            <input
+              v-model="partsContext"
+              type="text"
+              class="input input-bordered input-sm w-48"
+              placeholder="Context (optional)"
+            />
             <button
               class="btn btn-sm"
               :disabled="aiParts || partsBlocked"
@@ -164,6 +176,12 @@
             >
               Mark impossible
             </button>
+            <input
+              v-model="usageContext"
+              type="text"
+              class="input input-bordered input-sm w-48"
+              placeholder="Context (optional)"
+            />
             <button
               class="btn btn-sm"
               :disabled="aiUsage || usageBlocked"
@@ -341,6 +359,9 @@ const childDraft = ref('')
 const childSuggestions = ref<Gloss[]>([])
 const noteDraft = ref('')
 const noteLang = ref(props.nativeLanguage)
+const translationContext = ref('')
+const partsContext = ref('')
+const usageContext = ref('')
 const aiModalOpen = ref(false)
 const aiModalTitle = ref('')
 const aiModalItems = ref<string[]>([])
@@ -545,7 +566,8 @@ async function generateTranslations() {
       gloss.value.language === props.nativeLanguage ? 'toTarget' : 'toNative',
       [`${gloss.value.language}:${gloss.value.slug}`],
       props.nativeLanguage,
-      props.targetLanguage
+      props.targetLanguage,
+      { context: translationContext.value }
     )
     aiModalKind.value = 'translations'
     aiModalItems.value = res[0]?.suggestions || []
@@ -568,7 +590,9 @@ async function generateParts() {
   }
   aiParts.value = true
   try {
-    const res = await aiPartsGen(apiKey, [`${gloss.value.language}:${gloss.value.slug}`])
+    const res = await aiPartsGen(apiKey, [`${gloss.value.language}:${gloss.value.slug}`], {
+      context: partsContext.value
+    })
     aiModalKind.value = 'parts'
     aiModalItems.value = res[0]?.suggestions || []
     aiModalTitle.value = 'Confirm parts'
@@ -590,7 +614,9 @@ async function generateUsage() {
   }
   aiUsage.value = true
   try {
-    const res = await aiUsageGen(apiKey, [`${gloss.value.language}:${gloss.value.slug}`])
+    const res = await aiUsageGen(apiKey, [`${gloss.value.language}:${gloss.value.slug}`], {
+      context: usageContext.value
+    })
     aiModalKind.value = 'usage'
     aiModalItems.value = res[0]?.suggestions || []
     aiModalTitle.value = 'Confirm usage examples'
@@ -766,7 +792,14 @@ async function markUsageImpossible() {
 async function deleteGloss() {
   if (!gloss.value) return
   const ref = `${gloss.value.language}:${gloss.value.slug}`
-  const ok = confirm(`Delete ${ref}? This will clean references.`)
+  const usage = await window.electronAPI.gloss.checkReferences(ref)
+  const lines = [
+    `Delete ${ref}? This will clean references.`,
+    `Used as part in: ${usage.usedAsPart.join(', ') || 'none'}`,
+    `Used as usage example in: ${usage.usedAsUsageExample.join(', ') || 'none'}`,
+    `Used as translation in: ${usage.usedAsTranslation.join(', ') || 'none'}`
+  ]
+  const ok = confirm(lines.join('\n'))
   if (!ok) return
   try {
     await window.electronAPI.gloss.deleteWithCleanup(gloss.value.language, gloss.value.slug!)
@@ -831,6 +864,9 @@ watch(
       usageDraft.value = ''
       childDraft.value = ''
       noteDraft.value = ''
+      translationContext.value = ''
+      partsContext.value = ''
+      usageContext.value = ''
     }
   }
 )

@@ -74,6 +74,29 @@
     </div>
 
     <!-- AI Tools -->
+    <div class="space-y-3">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+        <fieldset class="fieldset">
+          <label class="label">How many</label>
+          <input
+            v-model.number="goalCount"
+            type="number"
+            min="1"
+            max="20"
+            class="input input-bordered input-sm w-full"
+          />
+        </fieldset>
+        <fieldset class="fieldset md:col-span-2">
+          <label class="label">Context (optional)</label>
+          <input
+            v-model="goalContext"
+            type="text"
+            class="input input-bordered input-sm w-full"
+            placeholder="e.g. business trip, with kids, formal tone"
+          />
+        </fieldset>
+      </div>
+
       <div class="flex gap-2">
         <button class="btn btn-sm" :disabled="aiGenerating" @click="generateUnderstandingGoals">
           Add Understand Goals
@@ -82,6 +105,7 @@
           Add Procedural Goals
         </button>
       </div>
+    </div>
 
     <!-- Goal Confirmation Modal -->
 <GoalConfirmModal
@@ -139,6 +163,8 @@ const { settings } = useSettings()
 
 const proceduralInput = ref('')
 const understandingInput = ref('')
+const goalCount = ref(5)
+const goalContext = ref('')
 
 // AI goal generation state
 const showGoalModal = ref(false)
@@ -250,7 +276,8 @@ async function generateUnderstandingGoals() {
       apiKey,
       props.situation.content,
       props.targetLanguage,
-      5
+      goalCount.value || 5,
+      goalContext.value
     )
     generatedGoals.value = result.goals
     modalMessage.value = result.message
@@ -287,7 +314,8 @@ async function generateProceduralGoals() {
       props.situation.content,
       props.nativeLanguage,
       props.targetLanguage,
-      5
+      goalCount.value || 5,
+      goalContext.value
     )
     generatedGoals.value = result.goals
     modalMessage.value = result.message
