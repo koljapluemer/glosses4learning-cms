@@ -235,9 +235,16 @@ async function deleteSituation(situation: Situation) {
   }
 
   try {
-    await window.electronAPI.gloss.delete(situation.language, situation.slug)
-    situations.value = situations.value.filter((s) => s.slug !== situation.slug)
-    success('Situation deleted')
+    const result = await window.electronAPI.gloss.deleteWithCleanup(
+      situation.language,
+      situation.slug
+    )
+    if (result.success) {
+      situations.value = situations.value.filter((s) => s.slug !== situation.slug)
+      success(result.message)
+    } else {
+      error(result.message || 'Delete failed')
+    }
   } catch (err) {
     error('Failed to delete situation')
     console.error(err)

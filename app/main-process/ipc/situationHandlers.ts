@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import path from 'path'
 import { GlossStorage } from '../storage/fsGlossStorage'
+import type { Gloss } from '../storage/types'
 
 const dataRoot = path.join(process.cwd(), 'data')
 const situationsRoot = path.join(process.cwd(), 'situations')
@@ -8,17 +9,18 @@ const storage = new GlossStorage(dataRoot, situationsRoot)
 
 export function setupSituationHandlers() {
   ipcMain.handle('situation:list', async (_, query?: string) => {
-    const allGlosses = storage.listGlosses('eng')
-    const situations = allGlosses.filter((gloss) => gloss.tags?.includes('eng:situation'))
+    const results: Gloss[] = []
+    const lowerQuery = query?.toLowerCase() || null
 
-    if (!query) {
-      return situations.slice(0, 100) // Limit results
+    for (const gloss of storage.findGlossesByTag('eng:situation')) {
+      if (lowerQuery && !gloss.content.toLowerCase().includes(lowerQuery)) {
+        continue
+      }
+      results.push(gloss)
+      if (results.length >= 100) break
     }
 
-    const lowerQuery = query.toLowerCase()
-    return situations
-      .filter((s) => s.content.toLowerCase().includes(lowerQuery))
-      .slice(0, 100)
+    return results
   })
 
   ipcMain.handle('situation:create', async (_, content: string) => {

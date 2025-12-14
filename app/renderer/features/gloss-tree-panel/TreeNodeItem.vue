@@ -76,8 +76,9 @@ function handleToggleExclude() {
 }
 
 function handleDetach() {
-  // TODO: Smart field detection based on parent-child relationship
-  // For now, emit with empty parent ref - needs parent context
-  emit('detach', '', '', glossRef(props.node.gloss))
+  const parent = props.node.parentRef
+  const field = props.node.viaField
+  const child = glossRef(props.node.gloss)
+  emit('detach', parent || '', field || '', child)
 }
 </script>

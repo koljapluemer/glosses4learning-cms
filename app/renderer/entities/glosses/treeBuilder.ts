@@ -13,6 +13,7 @@ import {
   TRANSLATION_IMPOSSIBLE_MARKER,
   USAGE_IMPOSSIBLE_MARKER
 } from './goalState'
+import type { RelationshipField } from './relationRules'
 
 function normalizeLanguageCode(code: string | null | undefined): string {
   return (code || '').trim().toLowerCase()
@@ -31,6 +32,8 @@ export interface TreeNode {
   warn_parts_missing: boolean
   state: 'red' | 'yellow' | 'green' | ''
   goal_type?: 'procedural' | 'understand'
+  parentRef?: string
+  viaField?: RelationshipField
 }
 
 export interface TreeStats {
@@ -150,7 +153,9 @@ export function buildGoalNodes(
     allowTranslations: boolean = true,
     path: Set<string> | null = null,
     partsLine: boolean = false,
-    learnLang: string = ''
+    learnLang: string = '',
+    parentRef: string | null = null,
+    viaField: RelationshipField | null = null
   ): TreeNode | null {
     const tags = gloss.tags || []
     if (gloss.language === target && tags.includes('eng:paraphrase')) {
@@ -174,7 +179,9 @@ export function buildGoalNodes(
       warn_target_missing: flags.warn_target_missing,
       warn_usage_missing: flags.warn_usage_missing,
       warn_parts_missing: stats.parts_missing.has(key),
-      state: role === 'root' ? determineGoalState(gloss, storage, native, target) : ''
+      state: role === 'root' ? determineGoalState(gloss, storage, native, target) : '',
+      parentRef: parentRef || undefined,
+      viaField: viaField || undefined
     }
 
     if (currentPath.has(key)) {
@@ -206,7 +213,9 @@ export function buildGoalNodes(
         true,
         nextPath,
         childPartsLine,
-        learnLang
+        learnLang,
+        `${gloss.language}:${gloss.slug || gloss.content}`,
+        'parts'
       )
       if (partNode) {
         node.children.push(partNode)
@@ -238,7 +247,9 @@ export function buildGoalNodes(
             !nextPath.has(childKey),
             nextPath,
             false,
-            learnLang
+            learnLang,
+            `${gloss.language}:${gloss.slug || gloss.content}`,
+            'translations'
           )
           if (tNode) {
             node.children.push(tNode)
@@ -262,7 +273,9 @@ export function buildGoalNodes(
             true,
             nextPath,
             false,
-            learnLang
+            learnLang,
+            `${gloss.language}:${gloss.slug || gloss.content}`,
+            'usage_examples'
           )
           if (usageNode) {
             node.children.push(usageNode)
@@ -296,7 +309,18 @@ export function buildGoalNodes(
       continue
     }
 
-    const node = buildNode(gloss, 'root', marker, false, true, null, true, learnLang)
+    const node = buildNode(
+      gloss,
+      'root',
+      marker,
+      false,
+      true,
+      null,
+      true,
+      learnLang,
+      `${situation.language}:${situation.slug || situation.content}`,
+      'children'
+    )
     if (node) {
       node.goal_type = goalType
       nodes.push(node)
