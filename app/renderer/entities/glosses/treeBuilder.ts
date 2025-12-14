@@ -44,6 +44,15 @@ export interface TreeStats {
   parts_missing: Set<string>
   usage_missing: Set<string>
   gloss_map: Record<string, Gloss>
+  goal_missing_by_root: Record<
+    string,
+    {
+      native_missing: Set<string>
+      target_missing: Set<string>
+      parts_missing: Set<string>
+      usage_missing: Set<string>
+    }
+  >
 }
 
 /**
@@ -66,7 +75,8 @@ export function buildGoalNodes(
     target_missing: new Set(),
     parts_missing: new Set(),
     usage_missing: new Set(),
-    gloss_map: {}
+    gloss_map: {},
+    goal_missing_by_root: {}
   }
 
   const seenKeys = new Set<string>()
@@ -86,11 +96,24 @@ export function buildGoalNodes(
     return (gl.translations || []).some((ref) => ref.startsWith(`${lang}:`))
   }
 
+  function ensureGoalStats(goalRef: string) {
+    if (!stats.goal_missing_by_root[goalRef]) {
+      stats.goal_missing_by_root[goalRef] = {
+        native_missing: new Set(),
+        target_missing: new Set(),
+        parts_missing: new Set(),
+        usage_missing: new Set()
+      }
+    }
+    return stats.goal_missing_by_root[goalRef]
+  }
+
   function markStats(
     gl: Gloss,
     usageLineage: boolean,
     partsLine: boolean,
-    learnLang: string
+    learnLang: string,
+    goalRootRef: string
   ): {
     warn_native_missing: boolean
     warn_target_missing: boolean
@@ -115,11 +138,13 @@ export function buildGoalNodes(
       !hasLog(gl, SPLIT_LOG_MARKER)
     ) {
       stats.parts_missing.add(key)
+      ensureGoalStats(goalRootRef).parts_missing.add(key)
     }
 
     if (gl.language === target) {
       if (!hasTranslation(gl, native) && !hasLog(gl, `${TRANSLATION_IMPOSSIBLE_MARKER}:${native}`)) {
         stats.native_missing.add(key)
+        ensureGoalStats(goalRootRef).native_missing.add(key)
       }
       if (
         !usageLineage &&
@@ -127,10 +152,12 @@ export function buildGoalNodes(
         !(gl.usage_examples || []).length
       ) {
         stats.usage_missing.add(key)
+        ensureGoalStats(goalRootRef).usage_missing.add(key)
       }
     } else if (gl.language === native) {
       if (!hasTranslation(gl, target) && !hasLog(gl, `${TRANSLATION_IMPOSSIBLE_MARKER}:${target}`)) {
         stats.target_missing.add(key)
+        ensureGoalStats(goalRootRef).target_missing.add(key)
       }
     }
 
@@ -155,7 +182,8 @@ export function buildGoalNodes(
     partsLine: boolean = false,
     learnLang: string = '',
     parentRef: string | null = null,
-    viaField: RelationshipField | null = null
+    viaField: RelationshipField | null = null,
+    goalRootRef: string
   ): TreeNode | null {
     const tags = gloss.tags || []
     if (gloss.language === target && tags.includes('eng:paraphrase')) {
@@ -166,7 +194,7 @@ export function buildGoalNodes(
     const key = glossKey(gloss)
     seenKeys.add(key)
 
-    const flags = markStats(gloss, usageLineage, partsLine, learnLang)
+    const flags = markStats(gloss, usageLineage, partsLine, learnLang, goalRootRef)
 
     const node: TreeNode = {
       gloss,
@@ -215,7 +243,8 @@ export function buildGoalNodes(
         childPartsLine,
         learnLang,
         `${gloss.language}:${gloss.slug || gloss.content}`,
-        'parts'
+        'parts',
+        goalRootRef
       )
       if (partNode) {
         node.children.push(partNode)
@@ -249,7 +278,8 @@ export function buildGoalNodes(
             false,
             learnLang,
             `${gloss.language}:${gloss.slug || gloss.content}`,
-            'translations'
+            'translations',
+            goalRootRef
           )
           if (tNode) {
             node.children.push(tNode)
@@ -275,7 +305,8 @@ export function buildGoalNodes(
             false,
             learnLang,
             `${gloss.language}:${gloss.slug || gloss.content}`,
-            'usage_examples'
+            'usage_examples',
+            goalRootRef
           )
           if (usageNode) {
             node.children.push(usageNode)
@@ -319,7 +350,8 @@ export function buildGoalNodes(
       true,
       learnLang,
       `${situation.language}:${situation.slug || situation.content}`,
-      'children'
+      'children',
+      `${gloss.language}:${gloss.slug || gloss.content}`
     )
     if (node) {
       node.goal_type = goalType

@@ -247,15 +247,21 @@ const goalStats = computed(() => {
     }
   }
   const goalRootRef = activeTab.value
-  const includeDesc = new Set<string>()
-  goalNodes.value.forEach((n) => includeDesc.add(`${n.gloss.language}:${n.gloss.slug}`))
-  const filterSet = (input: Set<string>) =>
-    Array.from(input).filter((ref) => includeDesc.has(ref) || ref === goalRootRef)
+  const perGoal = stats.goal_missing_by_root[goalRootRef]
+  if (!perGoal) {
+    return {
+      missingNative: [] as string[],
+      missingTarget: [] as string[],
+      missingParts: [] as string[],
+      missingUsage: [] as string[]
+    }
+  }
+  const toArray = (set: Set<string>) => Array.from(set)
   return {
-    missingNative: filterSet(stats.native_missing),
-    missingTarget: filterSet(stats.target_missing),
-    missingParts: filterSet(stats.parts_missing),
-    missingUsage: filterSet(stats.usage_missing)
+    missingNative: toArray(perGoal.native_missing),
+    missingTarget: toArray(perGoal.target_missing),
+    missingParts: toArray(perGoal.parts_missing),
+    missingUsage: toArray(perGoal.usage_missing)
   }
 })
 
