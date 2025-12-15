@@ -24,6 +24,9 @@ export interface Gloss {
   tags: GlossRef[]
   needsHumanCheck: boolean
   excludeFromLearning: boolean
+  decorativeImages?: string[]
+  semanticImages?: string[]
+  unambigiousImages?: string[]
 }
 
 export interface UsageInfo {

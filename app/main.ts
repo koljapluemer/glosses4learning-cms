@@ -6,6 +6,7 @@ import { setupLanguageHandlers } from './main-process/ipc/languageHandlers'
 import { setupSituationHandlers } from './main-process/ipc/situationHandlers'
 import { setupSettingsHandlers } from './main-process/ipc/settingsHandlers'
 import { setupAiLogHandlers } from './main-process/ipc/aiLogHandlers'
+import { setupImageHandlers } from './main-process/ipc/imageHandlers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -69,6 +70,7 @@ app.on('activate', () => {
 app.whenReady().then(() => {
   // Setup IPC handlers
   setupGlossHandlers()
+  setupImageHandlers()
   setupLanguageHandlers()
   setupSituationHandlers()
   setupSettingsHandlers()

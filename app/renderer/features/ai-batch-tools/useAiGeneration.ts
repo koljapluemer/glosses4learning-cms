@@ -97,6 +97,7 @@ Break expressions into learnable component parts - words or meaningful sub-expre
 
 Take each expression below and break it up into parts that can be learned on their own.
 Each returned item must be a meaningful standalone item.
+If an input cannot be split into meaningful part, return an empty array for this item.
 
 Return JSON with 'parts' array for each source.
 
@@ -128,7 +129,8 @@ function splitJudgePrompt(glosses: Gloss[]) {
   const bullets = glosses.map((g) => `- ${g.content}`).join('\n')
   return `You judge if expressions can be split into learnable parts.
 
-Single words cannot be split (false).
+Single words CANNOT be split and should return false!
+Do not return true if all a word can be split into is letters or syllables with no own meaning.
 Multi-word phrases or expressions can be split into component words or sub-expressions (true).
 
 For each gloss below, judge true/false.

@@ -99,6 +99,24 @@
       "type": "boolean",
       "description": "Flag to exclude this gloss from learning exports.",
       "default": false
+    },
+    "decorativeImages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Decorative image filenames (no semantic meaning for learning).",
+      "default": []
+    },
+    "semanticImages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Images with semantic meaning for learning.",
+      "default": []
+    },
+    "unambigiousImages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Images that unambiguously represent the gloss.",
+      "default": []
     }
   },
   "required": ["content"],

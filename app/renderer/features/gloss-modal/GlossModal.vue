@@ -281,6 +281,88 @@
         </fieldset>
       </section>
 
+      <section class="flex flex-col gap-4">
+        <label class="label">Images</label>
+
+        <div class="flex flex-col gap-2">
+          <div class="text-sm font-medium">Decorative</div>
+          <button class="btn btn-sm self-start" @click="pickImage('decorative')">
+            Add decorative image
+          </button>
+          <div v-if="gloss.decorativeImages?.length" class="flex flex-wrap gap-2">
+            <div
+              v-for="(img, idx) in gloss.decorativeImages"
+              :key="img"
+              class="relative w-24 h-24 border border-base-300 rounded"
+            >
+              <img
+                :src="imageUrl(img)"
+                class="w-full h-full object-cover rounded"
+                :alt="img"
+              />
+              <button
+                class="btn btn-ghost btn-xs absolute top-0 right-0"
+                @click="removeImage('decorative', idx)"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <div class="text-sm font-medium">Semantic</div>
+          <button class="btn btn-sm self-start" @click="pickImage('semantic')">
+            Add semantic image
+          </button>
+          <div v-if="gloss.semanticImages?.length" class="flex flex-wrap gap-2">
+            <div
+              v-for="(img, idx) in gloss.semanticImages"
+              :key="img"
+              class="relative w-24 h-24 border border-base-300 rounded"
+            >
+              <img
+                :src="imageUrl(img)"
+                class="w-full h-full object-cover rounded"
+                :alt="img"
+              />
+              <button
+                class="btn btn-ghost btn-xs absolute top-0 right-0"
+                @click="removeImage('semantic', idx)"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <div class="text-sm font-medium">Unambiguous</div>
+          <button class="btn btn-sm self-start" @click="pickImage('unambiguous')">
+            Add unambiguous image
+          </button>
+          <div v-if="gloss.unambigiousImages?.length" class="flex flex-wrap gap-2">
+            <div
+              v-for="(img, idx) in gloss.unambigiousImages"
+              :key="img"
+              class="relative w-24 h-24 border border-base-300 rounded"
+            >
+              <img
+                :src="imageUrl(img)"
+                class="w-full h-full object-cover rounded"
+                :alt="img"
+              />
+              <button
+                class="btn btn-ghost btn-xs absolute top-0 right-0"
+                @click="removeImage('unambiguous', idx)"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div class="flex flex-col gap-2 border-t pt-4">
         <div class="text-light">Deleting will remove this gloss and clean references.</div>
         <button class="btn btn-error self-start" @click="deleteGloss">Delete Gloss</button>
@@ -295,11 +377,35 @@
       @close="aiModalOpen = false"
       @confirm="applyAiSuggestions"
     />
+
+    <ModalShell :open="showFilenameModal" title="Image Filename" size="sm" @close="cancelFilenameInput">
+      <div class="flex flex-col gap-4">
+        <fieldset class="fieldset">
+          <label for="image-filename" class="label">
+            Filename (alphanumeric and underscores only)
+          </label>
+          <input
+            id="image-filename"
+            v-model="filenameInput"
+            type="text"
+            class="input input-bordered w-full"
+            placeholder="e.g. apple_fruit_red"
+            @keyup.enter="confirmFilename"
+          />
+        </fieldset>
+        <div class="flex gap-2 justify-end">
+          <button class="btn btn-sm" @click="cancelFilenameInput">Cancel</button>
+          <button class="btn btn-sm btn-primary" :disabled="!filenameInput.trim()" @click="confirmFilename">
+            Upload
+          </button>
+        </div>
+      </div>
+    </ModalShell>
   </ModalShell>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch, ref } from 'vue'
+import { computed, onMounted, watch, ref, toRaw } from 'vue'
 import { X, Trash2 } from 'lucide-vue-next'
 import ModalShell from '../../dumb/ModalShell.vue'
 import { useToasts } from '../toast-center/useToasts'
@@ -356,6 +462,13 @@ const transcriptionKeys = ref<Record<string, string>>({})
 const newTranscriptionKey = ref('')
 const newTranscriptionVal = ref('')
 const displayCache = ref(new Map<string, string>())
+const imageCache = ref<Map<string, string>>(new Map())
+
+type ImageCategory = 'decorative' | 'semantic' | 'unambiguous'
+
+const showFilenameModal = ref(false)
+const filenameInput = ref('')
+const pendingImageData = ref<{ base64: string; category: ImageCategory } | null>(null)
 
 const hasTranslations = computed(() => (gloss.value?.translations?.length || 0) > 0)
 const hasParts = computed(() => (gloss.value?.parts?.length || 0) > 0)
@@ -834,6 +947,103 @@ async function fetchSuggestions(
     setter(res)
   } catch (err) {
     console.error(err)
+  }
+}
+
+function imageUrl(filename: string): string {
+  const cached = imageCache.value.get(filename)
+  if (cached) return cached
+
+  window.electronAPI.image.load(filename).then((base64) => {
+    imageCache.value.set(filename, `data:image/webp;base64,${base64}`)
+  }).catch((err) => {
+    console.error('Failed to load image', filename, err)
+  })
+
+  return ''
+}
+
+async function pickImage(category: ImageCategory) {
+  if (!gloss.value) return
+
+  try {
+    const result = await window.electronAPI.image.pickFile()
+    if (!result) return
+
+    pendingImageData.value = { base64: result, category }
+    filenameInput.value = ''
+    showFilenameModal.value = true
+  } catch (err) {
+    console.error(err)
+    error('Failed to open file picker')
+  }
+}
+
+async function confirmFilename() {
+  if (!gloss.value || !pendingImageData.value) return
+  if (!filenameInput.value.trim()) return
+
+  try {
+    const { base64, category } = pendingImageData.value
+    const filename = await window.electronAPI.image.upload(base64, filenameInput.value)
+
+    const fieldMap = {
+      decorative: 'decorativeImages',
+      semantic: 'semanticImages',
+      unambiguous: 'unambigiousImages'
+    }
+    const field = fieldMap[category] as 'decorativeImages' | 'semanticImages' | 'unambigiousImages'
+
+    if (!gloss.value[field]) {
+      gloss.value[field] = []
+    }
+    gloss.value[field]!.push(filename)
+
+    await window.electronAPI.gloss.save(toRaw(gloss.value))
+    success('Image added')
+    emit('saved')
+
+    showFilenameModal.value = false
+    pendingImageData.value = null
+    filenameInput.value = ''
+  } catch (err) {
+    console.error(err)
+    error(err instanceof Error ? err.message : 'Failed to upload image')
+  }
+}
+
+function cancelFilenameInput() {
+  showFilenameModal.value = false
+  pendingImageData.value = null
+  filenameInput.value = ''
+}
+
+async function removeImage(category: ImageCategory, index: number) {
+  if (!gloss.value) return
+
+  const fieldMap = {
+    decorative: 'decorativeImages',
+    semantic: 'semanticImages',
+    unambiguous: 'unambigiousImages'
+  }
+  const field = fieldMap[category] as 'decorativeImages' | 'semanticImages' | 'unambigiousImages'
+  const images = gloss.value[field]
+
+  if (!images || !images[index]) return
+
+  const filename = images[index]
+  const ok = confirm(`Remove image ${filename}?`)
+  if (!ok) return
+
+  try {
+    images.splice(index, 1)
+    await window.electronAPI.gloss.save(toRaw(gloss.value))
+
+    success('Image removed')
+    emit('saved')
+  } catch (err) {
+    console.error(err)
+    error('Failed to remove image')
   }
 }
 

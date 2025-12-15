@@ -1,5 +1,16 @@
 <template>
   <div class="space-y-6">
+    <!-- Situation Info -->
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-sm text-light">Situation</div>
+        <div class="font-medium">{{ situation.content }}</div>
+      </div>
+      <button class="btn btn-sm" @click="editSituation">
+        Edit situation
+      </button>
+    </div>
+
     <!-- Goals Table -->
     <div v-if="goals.length > 0" class="overflow-x-auto">
       <table class="table">
@@ -107,26 +118,37 @@
     </div>
 
     <!-- Goal Confirmation Modal -->
-<GoalConfirmModal
-  :open="showGoalModal"
-  :title="modalTitle"
-  :message="modalMessage"
-  :goals="generatedGoals"
+    <GoalConfirmModal
+      :open="showGoalModal"
+      :title="modalTitle"
+      :message="modalMessage"
+      :goals="generatedGoals"
       :loading="aiGenerating"
       :error="aiError"
       @close="closeGoalModal"
       @confirm="confirmGoals"
     />
+
+    <!-- Situation Gloss Modal -->
+    <GlossModal
+      :open="showSituationModal"
+      :gloss-ref="situationRef"
+      :native-language="nativeLanguage"
+      :target-language="targetLanguage"
+      @close="showSituationModal = false"
+      @saved="handleSituationSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ExternalLink, Unlink, Trash2, Edit } from 'lucide-vue-next'
 import { useToasts } from '../../features/toast-center/useToasts'
 import { useSettings } from '../../entities/system/settingsStore'
 import { generateUnderstandingGoals as aiGenerateUnderstanding, generateProceduralGoals as aiGenerateProcedural } from '../../entities/ai/goalGenerator'
 import GoalConfirmModal from '../../features/goal-confirm-modal/GoalConfirmModal.vue'
+import GlossModal from '../../features/gloss-modal/GlossModal.vue'
 
 interface Situation {
   slug: string
@@ -173,6 +195,10 @@ const generatedGoals = ref<string[]>([])
 const aiGenerating = ref(false)
 const aiError = ref<string | null>(null)
 const pendingGoalType = ref<'procedural' | 'understanding' | null>(null)
+
+// Situation modal state
+const showSituationModal = ref(false)
+const situationRef = computed(() => `${props.situation.language}:${props.situation.slug}`)
 
 /**
  * Add a procedural goal (native language paraphrase expression)
@@ -331,6 +357,14 @@ function closeGoalModal() {
   generatedGoals.value = []
   aiError.value = null
   pendingGoalType.value = null
+}
+
+function editSituation() {
+  showSituationModal.value = true
+}
+
+function handleSituationSaved() {
+  success('Situation updated')
 }
 
 /**

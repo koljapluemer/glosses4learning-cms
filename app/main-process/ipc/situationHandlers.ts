@@ -93,7 +93,7 @@ function cleanupOldExports(outputRoot: string, expectedFiles: Set<string>) {
         if (stat.isDirectory()) continue
 
         const lower = file.toLowerCase()
-        const isExportFile = lower.endsWith('.json') || lower.endsWith('.jsonl')
+        const isExportFile = lower.endsWith('.json') || lower.endsWith('.jsonl') || lower.endsWith('.webp')
         if (!isExportFile) continue
 
         if (!expectedFiles.has(filePath)) {
@@ -158,9 +158,11 @@ function performBatchExport(): SituationExportResult {
           const exportObj: {
             'procedural-paraphrase-expression-goals': GoalPayload[]
             'understand-expression-goals': GoalPayload[]
+            image?: string
           } = {
             'procedural-paraphrase-expression-goals': [],
-            'understand-expression-goals': []
+            'understand-expression-goals': [],
+            image: undefined
           }
           const allRefs = new Set<string>()
           const situationRef = `${situation.language}:${situation.slug}`
@@ -223,6 +225,23 @@ function performBatchExport(): SituationExportResult {
           const baseFilename = situation.content
           const situationJsonPath = path.join(outputDir, `${baseFilename}.json`)
           const glossesJsonlPath = path.join(outputDir, `${baseFilename}.jsonl`)
+
+          // Handle decorative image export (only for situation glosses)
+          if (situation.decorativeImages && situation.decorativeImages.length > 0) {
+            const randomIndex = Math.floor(Math.random() * situation.decorativeImages.length)
+            const selectedImage = situation.decorativeImages[randomIndex]
+
+            const sourceImagePath = path.join(dataRoot, 'images', selectedImage)
+            if (fs.existsSync(sourceImagePath)) {
+              const situationImageFilename = `${baseFilename}.webp`
+              const situationImagePath = path.join(outputDir, situationImageFilename)
+
+              fs.copyFileSync(sourceImagePath, situationImagePath)
+              exportedFiles.add(situationImagePath)
+
+              exportObj.image = situationImageFilename
+            }
+          }
 
           fs.writeFileSync(situationJsonPath, JSON.stringify(exportObj, null, 2), 'utf-8')
           fs.writeFileSync(glossesJsonlPath, jsonlLines.join('\n'), 'utf-8')

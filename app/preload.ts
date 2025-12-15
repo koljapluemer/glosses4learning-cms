@@ -60,6 +60,13 @@ export type ElectronAPI = {
   aiLog: {
     write: (entry: { action: string; refs?: string[]; payload?: Record<string, unknown> }) => Promise<void>
   }
+  image: {
+    upload: (base64Data: string, userSlug: string) => Promise<string>
+    exists: (filename: string) => Promise<boolean>
+    delete: (filename: string) => Promise<void>
+    load: (filename: string) => Promise<string>
+    pickFile: () => Promise<string | null>
+  }
 }
 
 // Expose protected methods that allow the renderer process to use
@@ -112,6 +119,13 @@ const api: ElectronAPI = {
   },
   aiLog: {
     write: (entry) => ipcRenderer.invoke('ai-log:write', entry)
+  },
+  image: {
+    upload: (base64Data, userSlug) => ipcRenderer.invoke('image:upload', base64Data, userSlug),
+    exists: (filename) => ipcRenderer.invoke('image:exists', filename),
+    delete: (filename) => ipcRenderer.invoke('image:delete', filename),
+    load: (filename) => ipcRenderer.invoke('image:load', filename),
+    pickFile: () => ipcRenderer.invoke('image:pickFile')
   }
 }
 

@@ -83,7 +83,10 @@ export class GlossStorage {
       notes: [],
       tags: [],
       needsHumanCheck: false,
-      excludeFromLearning: false
+      excludeFromLearning: false,
+      decorativeImages: [],
+      semanticImages: [],
+      unambigiousImages: []
     }
 
     return this.createGloss(gloss)
@@ -145,7 +148,10 @@ export class GlossStorage {
       notes: data.notes ?? [],
       tags: data.tags ?? [],
       needsHumanCheck: data.needsHumanCheck ?? false,
-      excludeFromLearning: data.excludeFromLearning ?? false
+      excludeFromLearning: data.excludeFromLearning ?? false,
+      decorativeImages: (data.decorativeImages as string[]) ?? [],
+      semanticImages: (data.semanticImages as string[]) ?? [],
+      unambigiousImages: (data.unambigiousImages as string[]) ?? []
     }
   }
 
