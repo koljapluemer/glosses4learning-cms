@@ -154,10 +154,9 @@ function performBatchExport(): SituationExportResult {
             continue
           }
 
-          type GoalPayload = { finalChallenge: string; needToBeLearned: string[]; references: string[] }
           const exportObj: {
-            'procedural-paraphrase-expression-goals': GoalPayload[]
-            'understand-expression-goals': GoalPayload[]
+            'procedural-paraphrase-expression-goals': string[]
+            'understand-expression-goals': string[]
             image?: string
           } = {
             'procedural-paraphrase-expression-goals': [],
@@ -179,17 +178,13 @@ function performBatchExport(): SituationExportResult {
             const goalType = root.goal_type
             if (goalType !== 'procedural' && goalType !== 'understanding') continue
 
-            const { refs, learn } = gatherRefs(root)
+            const { refs } = gatherRefs(root)
             refs.forEach((r) => allRefs.add(r))
-            const payload = {
-              finalChallenge: nodeRef(root.gloss),
-              needToBeLearned: learn,
-              references: refs
-            }
+            const challenge = nodeRef(root.gloss)
             if (goalType === 'procedural') {
-              exportObj['procedural-paraphrase-expression-goals'].push(payload)
+              exportObj['procedural-paraphrase-expression-goals'].push(challenge)
             } else {
-              exportObj['understand-expression-goals'].push(payload)
+              exportObj['understand-expression-goals'].push(challenge)
             }
           }
 
