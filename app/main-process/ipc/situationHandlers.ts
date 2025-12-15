@@ -49,6 +49,28 @@ function loadLanguageCodes(): string[] {
     .filter(Boolean)
 }
 
+function loadAllLanguages(): Record<string, { displayName: string; symbol: string }> {
+  const langDir = path.join(dataRoot, 'language')
+  const languages: Record<string, { displayName: string; symbol: string }> = {}
+
+  if (!fs.existsSync(langDir)) return languages
+
+  for (const file of fs.readdirSync(langDir)) {
+    if (!file.endsWith('.json')) continue
+
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(langDir, file), 'utf-8'))
+      if (data.isoCode && data.displayName && data.symbol) {
+        languages[data.isoCode] = { displayName: data.displayName, symbol: data.symbol }
+      }
+    } catch (err) {
+      console.warn('Failed to read language file', file, err)
+    }
+  }
+
+  return languages
+}
+
 function nodeRef(gl: Gloss): string {
   return `${gl.language}:${gl.slug || gl.content}`
 }
@@ -278,13 +300,19 @@ function performBatchExport(): SituationExportResult {
     }
 
     // Write metadata files
-    // 1. Root level: available_native_languages.json
+    // 1. Root level: languages.json
+    const allLanguages = loadAllLanguages()
+    const languagesJsonPath = path.join(outputRoot, 'languages.json')
+    fs.writeFileSync(languagesJsonPath, JSON.stringify(allLanguages, null, 2), 'utf-8')
+    exportedFiles.add(languagesJsonPath)
+
+    // 2. Root level: available_native_languages.json
     const nativeLanguagesArray = Array.from(nativeLanguagesUsed).sort()
     const nativeLanguagesJsonPath = path.join(outputRoot, 'available_native_languages.json')
     fs.writeFileSync(nativeLanguagesJsonPath, JSON.stringify(nativeLanguagesArray, null, 2), 'utf-8')
     exportedFiles.add(nativeLanguagesJsonPath)
 
-    // 2. For each native language: available_target_languages.json
+    // 3. For each native language: available_target_languages.json
     for (const native of nativeLanguagesUsed) {
       const targets = Array.from(targetLanguagesByNative.get(native)!).sort()
       const targetsJsonPath = path.join(outputRoot, native, 'available_target_languages.json')
@@ -292,7 +320,7 @@ function performBatchExport(): SituationExportResult {
       exportedFiles.add(targetsJsonPath)
     }
 
-    // 3. For each native/target combination: situations.json
+    // 4. For each native/target combination: situations.json
     for (const [native, targetsMap] of situationsByNativeTarget) {
       for (const [target, situationsMap] of targetsMap) {
         const situationsJsonPath = path.join(outputRoot, native, target, 'situations.json')
