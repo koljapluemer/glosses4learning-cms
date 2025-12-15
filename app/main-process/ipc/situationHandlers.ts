@@ -126,6 +126,9 @@ function performBatchExport(): SituationExportResult {
 
   try {
     const exportedFiles = new Set<string>()
+    const nativeLanguagesUsed = new Set<string>()
+    const targetLanguagesByNative = new Map<string, Set<string>>()
+    const situationsByNativeTarget = new Map<string, Map<string, { [situation: string]: boolean }>>()
     const situations: Gloss[] = []
     for (const gloss of storage.findGlossesByTag('eng:situation')) {
       situations.push(gloss)
@@ -157,11 +160,9 @@ function performBatchExport(): SituationExportResult {
           const exportObj: {
             'procedural-paraphrase-expression-goals': string[]
             'understand-expression-goals': string[]
-            image?: string
           } = {
             'procedural-paraphrase-expression-goals': [],
-            'understand-expression-goals': [],
-            image: undefined
+            'understand-expression-goals': []
           }
           const allRefs = new Set<string>()
           const situationRef = `${situation.language}:${situation.slug}`
@@ -221,6 +222,8 @@ function performBatchExport(): SituationExportResult {
           const situationJsonPath = path.join(outputDir, `${baseFilename}.json`)
           const glossesJsonlPath = path.join(outputDir, `${baseFilename}.jsonl`)
 
+          let situationImageFilename: string | false = false
+
           // Handle decorative image export (only for situation glosses)
           if (situation.decorativeImages && situation.decorativeImages.length > 0) {
             const randomIndex = Math.floor(Math.random() * situation.decorativeImages.length)
@@ -228,20 +231,34 @@ function performBatchExport(): SituationExportResult {
 
             const sourceImagePath = path.join(dataRoot, 'images', selectedImage)
             if (fs.existsSync(sourceImagePath)) {
-              const situationImageFilename = `${baseFilename}.webp`
+              situationImageFilename = `${baseFilename}.webp`
               const situationImagePath = path.join(outputDir, situationImageFilename)
 
               fs.copyFileSync(sourceImagePath, situationImagePath)
               exportedFiles.add(situationImagePath)
-
-              exportObj.image = situationImageFilename
             }
           }
 
+          // Write situation JSON without image field
           fs.writeFileSync(situationJsonPath, JSON.stringify(exportObj, null, 2), 'utf-8')
           fs.writeFileSync(glossesJsonlPath, jsonlLines.join('\n'), 'utf-8')
           exportedFiles.add(situationJsonPath)
           exportedFiles.add(glossesJsonlPath)
+
+          // Track metadata
+          nativeLanguagesUsed.add(native)
+          if (!targetLanguagesByNative.has(native)) {
+            targetLanguagesByNative.set(native, new Set())
+          }
+          targetLanguagesByNative.get(native)!.add(target)
+
+          if (!situationsByNativeTarget.has(native)) {
+            situationsByNativeTarget.set(native, new Map())
+          }
+          if (!situationsByNativeTarget.get(native)!.has(target)) {
+            situationsByNativeTarget.get(native)!.set(target, {})
+          }
+          situationsByNativeTarget.get(native)!.get(target)![baseFilename] = situationImageFilename !== false
 
           result.exports.push({
             situation: situationRef,
@@ -257,6 +274,30 @@ function performBatchExport(): SituationExportResult {
           })
           result.totalExports += 1
         }
+      }
+    }
+
+    // Write metadata files
+    // 1. Root level: available_native_languages.json
+    const nativeLanguagesArray = Array.from(nativeLanguagesUsed).sort()
+    const nativeLanguagesJsonPath = path.join(outputRoot, 'available_native_languages.json')
+    fs.writeFileSync(nativeLanguagesJsonPath, JSON.stringify(nativeLanguagesArray, null, 2), 'utf-8')
+    exportedFiles.add(nativeLanguagesJsonPath)
+
+    // 2. For each native language: available_target_languages.json
+    for (const native of nativeLanguagesUsed) {
+      const targets = Array.from(targetLanguagesByNative.get(native)!).sort()
+      const targetsJsonPath = path.join(outputRoot, native, 'available_target_languages.json')
+      fs.writeFileSync(targetsJsonPath, JSON.stringify(targets, null, 2), 'utf-8')
+      exportedFiles.add(targetsJsonPath)
+    }
+
+    // 3. For each native/target combination: situations.json
+    for (const [native, targetsMap] of situationsByNativeTarget) {
+      for (const [target, situationsMap] of targetsMap) {
+        const situationsJsonPath = path.join(outputRoot, native, target, 'situations.json')
+        fs.writeFileSync(situationsJsonPath, JSON.stringify(situationsMap, null, 2), 'utf-8')
+        exportedFiles.add(situationsJsonPath)
       }
     }
 
