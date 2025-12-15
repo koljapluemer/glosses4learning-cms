@@ -86,6 +86,10 @@
             :goals="goals"
             :native-language="nativeLang"
             :target-language="targetLang"
+            :missing-native-refs="situationStats.missingNative"
+            :missing-target-refs="situationStats.missingTarget"
+            :missing-parts-refs="situationStats.missingParts"
+            :missing-usage-refs="situationStats.missingUsage"
             @add-goal="addGoal"
             @select-goal="selectGoal"
             @reload-goals="reloadGoals"
@@ -334,6 +338,25 @@ const goalStats = computed(() => {
     missingTarget: toArray(perGoal.target_missing),
     missingParts: toArray(perGoal.parts_missing),
     missingUsage: toArray(perGoal.usage_missing)
+  }
+})
+
+const situationStats = computed(() => {
+  const stats = treeStats.value
+  if (!stats) {
+    return {
+      missingNative: [] as string[],
+      missingTarget: [] as string[],
+      missingParts: [] as string[],
+      missingUsage: [] as string[]
+    }
+  }
+  const toArray = (set: Set<string>) => Array.from(set)
+  return {
+    missingNative: toArray(stats.native_missing),
+    missingTarget: toArray(stats.target_missing),
+    missingParts: toArray(stats.parts_missing),
+    missingUsage: toArray(stats.usage_missing)
   }
 })
 

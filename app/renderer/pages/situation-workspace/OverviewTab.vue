@@ -117,6 +117,19 @@
       </div>
     </div>
 
+    <!-- AI Batch Tools -->
+    <AiBatchToolPanel
+      :goal-ref="situationRef"
+      :goal-kind="null"
+      :native-language="nativeLanguage"
+      :target-language="targetLanguage"
+      :missing-native-refs="missingNativeRefs"
+      :missing-target-refs="missingTargetRefs"
+      :missing-parts-refs="missingPartsRefs"
+      :missing-usage-refs="missingUsageRefs"
+      @applied="handleBatchToolsApplied"
+    />
+
     <!-- Goal Confirmation Modal -->
     <GoalConfirmModal
       :open="showGoalModal"
@@ -149,6 +162,7 @@ import { useSettings } from '../../entities/system/settingsStore'
 import { generateUnderstandingGoals as aiGenerateUnderstanding, generateProceduralGoals as aiGenerateProcedural } from '../../entities/ai/goalGenerator'
 import GoalConfirmModal from '../../features/goal-confirm-modal/GoalConfirmModal.vue'
 import GlossModal from '../../features/gloss-modal/GlossModal.vue'
+import AiBatchToolPanel from '../../features/ai-batch-tools/AiBatchToolPanel.vue'
 
 interface Situation {
   slug: string
@@ -168,6 +182,10 @@ const props = defineProps<{
   goals: Goal[]
   nativeLanguage: string
   targetLanguage: string
+  missingNativeRefs: string[]
+  missingTargetRefs: string[]
+  missingPartsRefs: string[]
+  missingUsageRefs: string[]
 }>()
 
 const emit = defineEmits<{
@@ -365,6 +383,11 @@ function editSituation() {
 
 function handleSituationSaved() {
   success('Situation updated')
+}
+
+function handleBatchToolsApplied() {
+  success('Applied AI batch suggestions')
+  emit('reload-goals')
 }
 
 /**
