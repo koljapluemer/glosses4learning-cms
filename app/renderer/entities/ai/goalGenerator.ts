@@ -54,7 +54,6 @@ async function runJsonList(apiKey: string, prompt: string): Promise<string[]> {
 
 /**
  * Generate understanding goals for a situation
- * Port of agent/tools/llm/generate_understanding_goals.py:13-148
  */
 export async function generateUnderstandingGoals(
   apiKey: string,
@@ -69,6 +68,8 @@ export async function generateUnderstandingGoals(
 Generate ${numGoals} expressions in ${targetLanguage} for the situation: "${situationContent}".
 
 These are things a learner might HEAR or encounter in ${targetLanguage} and need to UNDERSTAND.
+Make sure these are NOT things the learner may want to say themselves, but EXCLUSIVELY things the learner may HEAR FROM OTHERS.
+E.g., if the context is 'order at a restaurant', the learner will never HEAR "Die Rechnung, bitte", so DO NOT INCLUDE SUCH EXAMPLES. 
 
 Examples:
 - Questions people might ask them
