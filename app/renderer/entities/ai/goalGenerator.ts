@@ -113,6 +113,9 @@ Generate ${numGoals} paraphrased expressions in ${nativeLanguage} for the situat
 
 These are procedural descriptions in the learner's native language of things they might want to express in ${targetLanguage}.
 
+Make sure these are sepcific enough to be actually translatable into queries in a foreign language.
+E.g. do not include something vague like "share a personal story", because that is not something that can actually be translated.
+
 Requirements:
 - Formulate as standalone flashcards that make sense on their own
 - Use descriptors instead of dangling pronouns (e.g., "ask your friend" not "ask them")

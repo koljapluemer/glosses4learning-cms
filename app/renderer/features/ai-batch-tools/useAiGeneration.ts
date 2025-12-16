@@ -99,6 +99,8 @@ Take each expression below and break it up into parts that can be learned on the
 Each returned item must be a meaningful standalone item.
 If an input cannot be split into meaningful part, return an empty array for this item.
 
+Do not return meaningless parts such as punctuation symbol or syllables with no inherent meaning.
+
 Return JSON with 'parts' array for each source.
 
 Items:
