@@ -10,10 +10,10 @@
             Work on language learning situations and their goals
           </p>
           <div class="card-actions justify-end mt-4">
-            <button class="btn btn-primary" @click="showSituationPicker = true">
+            <router-link to="/pick-situation" class="btn btn-primary">
               <FolderOpen class="w-4 h-4 mr-2" />
               Open Situation
-            </button>
+            </router-link>
           </div>
         </div>
       </div>
@@ -35,11 +35,6 @@
       </div>
     </div>
 
-    <SituationPicker
-      :open="showSituationPicker"
-      @close="showSituationPicker = false"
-      @select="openSituation"
-    />
   </div>
 </template>
 
@@ -47,47 +42,14 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FolderOpen, Download, Loader2 } from 'lucide-vue-next'
-import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
 import { useSettings } from '../../entities/system/settingsStore'
 import { useToasts } from '../../features/toast-center/useToasts'
 
 const router = useRouter()
 const route = useRoute()
-const showSituationPicker = ref(false)
 const exporting = ref(false)
 const { settings } = useSettings()
 const { error, success, info } = useToasts()
-
-interface Situation {
-  slug: string
-  content: string
-  language: string
-  tags: string[]
-}
-
-function openSituation(situation: Situation) {
-  showSituationPicker.value = false
-
-  // Languages are now required from settings
-  const native = settings.value.nativeLanguage
-  const target = settings.value.targetLanguage
-
-  if (!native || !target) {
-    // Should never happen due to picker validation, but guard anyway
-    error('Languages not set')
-    return
-  }
-
-  router.push({
-    name: 'situation-workspace',
-    params: {
-      situationLang: situation.language,
-      situationSlug: situation.slug,
-      nativeLang: native,
-      targetLang: target
-    }
-  })
-}
 
 async function exportSituations() {
   if (exporting.value) return
@@ -125,9 +87,11 @@ onMounted(async () => {
         name: 'situation-workspace',
         params: {
           situationLang: lang,
-          situationSlug: slug,
-          nativeLang: nativeLanguage,
-          targetLang: targetLanguage
+          situationSlug: slug
+        },
+        query: {
+          native: nativeLanguage,
+          target: targetLanguage
         }
       })
     }

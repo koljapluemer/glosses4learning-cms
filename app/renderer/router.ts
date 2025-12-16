@@ -9,7 +9,12 @@ const router = createRouter({
       component: () => import('./pages/dashboard/DashboardPage.vue')
     },
     {
-      path: '/situation/:situationLang/:situationSlug/:nativeLang/:targetLang',
+      path: '/pick-situation',
+      name: 'pick-situation',
+      component: () => import('./pages/pick-situation/PickSituation.vue')
+    },
+    {
+      path: '/situation/:situationLang/:situationSlug',
       name: 'situation-workspace',
       component: () => import('./pages/situation-workspace/SituationWorkspace.vue')
     }

@@ -1,11 +1,12 @@
 <template>
-  <ModalShell :open="open" title="Select Situation & Languages" size="lg" @close="$emit('close')">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">Select Situation & Languages</h1>
     <div class="space-y-4">
       <!-- Language Selection -->
       <div class="grid grid-cols-2 gap-4 pb-4 border-b">
         <fieldset class="fieldset">
           <label class="label">Native Language</label>
-          <select v-model="localNative" class="select select-bordered w-full">
+          <select v-model="nativeLanguage" class="select select-bordered w-full">
             <option :value="null">-- Select --</option>
             <option v-for="lang in languages" :key="lang.isoCode" :value="lang.isoCode">
               {{ lang.symbol }} {{ lang.displayName }}
@@ -15,7 +16,7 @@
 
         <fieldset class="fieldset">
           <label class="label">Target Language</label>
-          <select v-model="localTarget" class="select select-bordered w-full">
+          <select v-model="targetLanguage" class="select select-bordered w-full">
             <option :value="null">-- Select --</option>
             <option v-for="lang in languages" :key="lang.isoCode" :value="lang.isoCode">
               {{ lang.symbol }} {{ lang.displayName }}
@@ -25,7 +26,7 @@
       </div>
 
       <!-- Warning if languages not set -->
-      <div v-if="!localNative || !localTarget" class="alert alert-warning">
+      <div v-if="!nativeLanguage || !targetLanguage" class="alert alert-warning">
         <span>Select both languages before choosing a situation</span>
       </div>
 
@@ -58,20 +59,13 @@
             >
               <button
                 class="flex-1 text-left"
-                :disabled="!localNative || !localTarget"
+                :disabled="!nativeLanguage || !targetLanguage"
                 @click="selectSituation(situation)"
               >
                 {{ situation.content }}
               </button>
 
               <!-- Action buttons -->
-              <button
-                class="btn btn-ghost btn-xs"
-                title="Open gloss"
-                @click="emit('open-gloss', situation)"
-              >
-                <ExternalLink class="w-4 h-4" />
-              </button>
               <button
                 class="btn btn-ghost btn-xs"
                 title="Remove situation tag"
@@ -105,15 +99,15 @@
         </button>
       </div>
     </div>
-  </ModalShell>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { Plus, Trash2, X, ExternalLink } from 'lucide-vue-next'
-import ModalShell from '../../dumb/ModalShell.vue'
+import { ref, computed, onMounted } from 'vue'
+import { Plus, Trash2, X } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
 import InlineAddField from '../../dumb/InlineAddField.vue'
-import { useToasts } from '../toast-center/useToasts'
+import { useToasts } from '../../features/toast-center/useToasts'
 import { loadLanguages, type Language } from '../../entities/languages/loader'
 import { useSettings } from '../../entities/system/settingsStore'
 
@@ -130,16 +124,7 @@ interface LanguageGroup {
   situations: Situation[]
 }
 
-const props = defineProps<{
-  open: boolean
-}>()
-
-const emit = defineEmits<{
-  close: []
-  select: [situation: Situation]
-  'open-gloss': [situation: Situation]
-}>()
-
+const router = useRouter()
 const { success, error } = useToasts()
 const { settings, setNativeLanguage, setTargetLanguage, setLastSituation } = useSettings()
 
@@ -148,8 +133,6 @@ const situations = ref<Situation[]>([])
 const loading = ref(false)
 const showCreateField = ref(false)
 const languages = ref<Language[]>([])
-const localNative = ref<string | null>(null)
-const localTarget = ref<string | null>(null)
 
 // Language names mapping (can be extended)
 const languageNames: Record<string, string> = {
@@ -158,6 +141,21 @@ const languageNames: Record<string, string> = {
   fra: 'French',
   spa: 'Spanish'
 }
+
+// Computed properties for direct binding to global settings
+const nativeLanguage = computed({
+  get: () => settings.value.nativeLanguage,
+  set: (val: string | null) => {
+    if (val) setNativeLanguage(val)
+  }
+})
+
+const targetLanguage = computed({
+  get: () => settings.value.targetLanguage,
+  set: (val: string | null) => {
+    if (val) setTargetLanguage(val)
+  }
+})
 
 const groupedSituations = computed(() => {
   const filtered = searchQuery.value
@@ -213,13 +211,25 @@ async function createSituation(content: string) {
 }
 
 async function selectSituation(situation: Situation) {
-  if (!localNative.value || !localTarget.value) {
+  if (!nativeLanguage.value || !targetLanguage.value) {
     return
   }
 
   const ref = `${situation.language}:${situation.slug}`
   await setLastSituation(ref)
-  emit('select', situation)
+
+  // Navigate to situation workspace with query params
+  router.push({
+    name: 'situation-workspace',
+    params: {
+      situationLang: situation.language,
+      situationSlug: situation.slug
+    },
+    query: {
+      native: nativeLanguage.value,
+      target: targetLanguage.value
+    }
+  })
 }
 
 async function removeSituationTag(situation: Situation) {
@@ -260,33 +270,12 @@ async function deleteSituation(situation: Situation) {
   }
 }
 
-// Sync language changes with settings
-watch(localNative, (val) => {
-  if (val) setNativeLanguage(val)
+// Load situations and languages when page loads
+onMounted(async () => {
+  // Load languages from backend
+  languages.value = await loadLanguages()
+
+  // Load situations
+  loadSituations()
 })
-
-watch(localTarget, (val) => {
-  if (val) setTargetLanguage(val)
-})
-
-// Load situations and languages when modal opens
-watch(
-  () => props.open,
-  async (isOpen) => {
-    if (isOpen) {
-      // Load languages from backend
-      languages.value = await loadLanguages()
-
-      // Sync with global settings
-      localNative.value = settings.value.nativeLanguage
-      localTarget.value = settings.value.targetLanguage
-
-      // Load situations
-      loadSituations()
-    } else {
-      searchQuery.value = ''
-      showCreateField.value = false
-    }
-  }
-)
 </script>

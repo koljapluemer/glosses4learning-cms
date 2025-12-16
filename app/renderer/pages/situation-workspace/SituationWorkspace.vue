@@ -7,9 +7,9 @@
         <button class="btn btn-sm btn-ghost btn-square" title="Home" @click="goHome">
           <Home class="w-4 h-4" />
         </button>
-        <button class="btn btn-sm" @click="showSituationPicker = true">
+        <router-link to="/pick-situation" class="btn btn-sm">
           {{ situationDisplay }}
-        </button>
+        </router-link>
         <button class="btn btn-sm btn-ghost btn-square" :disabled="loading || treeLoading" @click="refreshWorkspace" title="Refresh">
           <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': treeLoading }" />
         </button>
@@ -18,14 +18,6 @@
         </button>
       </div>
     </div>
-
-    <!-- Situation Picker Modal -->
-    <SituationPicker
-      :open="showSituationPicker"
-      @close="showSituationPicker = false"
-      @select="changeSituation"
-      @open-gloss="openSituationGloss"
-    />
 
     <!-- Settings Modal -->
     <SettingsModal
@@ -227,7 +219,6 @@ import {
   RefreshCw
 } from 'lucide-vue-next'
 import OverviewTab from './OverviewTab.vue'
-import SituationPicker from '../../features/situation-picker/SituationPicker.vue'
 import SettingsModal from '../../features/settings-modal/SettingsModal.vue'
 import GlossTreePanel from '../../features/gloss-tree-panel/GlossTreePanel.vue'
 import GlossModal from '../../features/gloss-modal/GlossModal.vue'
@@ -257,7 +248,6 @@ const goals = ref<Goal[]>([])
 const activeTab = ref<string>('overview')
 const loading = ref(false)
 const treeLoading = ref(false)
-const showSituationPicker = ref(false)
 const showSettings = ref(false)
 const languages = ref<Language[]>([])
 const treeNodes = ref<TreeNode[]>([])
@@ -269,9 +259,9 @@ const stateLog = ref('')
 const stateLogLoading = ref(false)
 const expandedRefs = ref<Record<string, boolean>>({})
 
-// Extract language params from route
-const nativeLang = computed(() => route.params.nativeLang as string)
-const targetLang = computed(() => route.params.targetLang as string)
+// Extract language from query params
+const nativeLang = computed(() => route.query.native as string)
+const targetLang = computed(() => route.query.target as string)
 
 // Display format: "situation content native→target"
 const situationDisplay = computed(() => {
@@ -386,8 +376,8 @@ async function loadSituation() {
   try {
     const situationLang = route.params.situationLang as string
     const situationSlug = route.params.situationSlug as string
-    const native = route.params.nativeLang as string
-    const target = route.params.targetLang as string
+    const native = route.query.native as string
+    const target = route.query.target as string
 
     if (!situationLang || !situationSlug || !native || !target) {
       error('Invalid situation parameters')
@@ -464,33 +454,6 @@ async function reloadGoals() {
   await refreshTree(situation.value)
 }
 
-function changeSituation(newSituation: Gloss) {
-  showSituationPicker.value = false
-
-  const native = settings.value.nativeLanguage
-  const target = settings.value.targetLanguage
-
-  if (!native || !target) {
-    error('Select native and target languages first')
-    return
-  }
-
-  // Navigate to new situation, preserving or updating languages from settings
-  router.push({
-    name: 'situation-workspace',
-    params: {
-      situationLang: newSituation.language,
-      situationSlug: newSituation.slug,
-      nativeLang: native,
-      targetLang: target
-    }
-  })
-}
-
-function openSituationGloss(situation: Gloss) {
-  activeGlossRef.value = `${situation.language}:${situation.slug}`
-  glossModalOpen.value = true
-}
 
 function goHome() {
   router.push({ name: 'dashboard', query: { noAutoOpen: '1' } })
@@ -817,8 +780,9 @@ function collapseAll() {
 }
 
 // Watch for route changes to reload situation
+// Watch the full route path to catch param changes
 watch(
-  () => route.params,
+  () => route.fullPath,
   () => {
     loadSituation()
   }
