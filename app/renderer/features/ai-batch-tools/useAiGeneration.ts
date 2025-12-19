@@ -257,6 +257,24 @@ export async function generateTranslations(
     const prompt = translationPrompt(mode, glosses, native, target, note, options)
     const bag = await runCompletion(apiKey, prompt, TEMP_TRANSLATION)
     const suggestions = mapSuggestions(glosses, bag)
+
+    // Find glosses that got no translations
+    const glossesWithoutTranslations = glosses.filter(g => {
+      const ref = `${g.language}:${g.slug}`
+      return !suggestions.some(s => s.glossRef === ref && s.suggestions.length > 0)
+    })
+
+    // Determine target language
+    const targetLang = mode === 'toNative' ? native : target
+
+    // Mark each one as impossible to translate
+    for (const gloss of glossesWithoutTranslations) {
+      await window.electronAPI.gloss.markLog(
+        `${gloss.language}:${gloss.slug}`,
+        `TRANSLATION_CONSIDERED_IMPOSSIBLE:${targetLang}`
+      )
+    }
+
     const suggestionDetails = suggestions.map((s) => ({
       ref: s.glossRef,
       count: s.suggestions.length,
@@ -310,6 +328,21 @@ export async function generateParts(
     const prompt = partsPrompt(filtered, aiNote, options)
     const bag = await runCompletion(apiKey, prompt, TEMP_GENERATION)
     const suggestions = mapSuggestions(filtered, bag)
+
+    // Find glosses that got no parts from LLM
+    const glossesWithoutParts = filtered.filter(g => {
+      const ref = `${g.language}:${g.slug}`
+      return !suggestions.some(s => s.glossRef === ref && s.suggestions.length > 0)
+    })
+
+    // Mark each one
+    for (const gloss of glossesWithoutParts) {
+      await window.electronAPI.gloss.markLog(
+        `${gloss.language}:${gloss.slug}`,
+        'SPLIT_CONSIDERED_UNNECESSARY'
+      )
+    }
+
     const suggestionDetails = suggestions.map((s) => ({
       ref: s.glossRef,
       count: s.suggestions.length,
@@ -363,6 +396,21 @@ export async function generateUsage(
     const prompt = usagePrompt(filtered, aiNote, options)
     const bag = await runCompletion(apiKey, prompt, TEMP_GENERATION)
     const suggestions = mapSuggestions(filtered, bag)
+
+    // Find glosses that got no usage examples from LLM
+    const glossesWithoutUsage = filtered.filter(g => {
+      const ref = `${g.language}:${g.slug}`
+      return !suggestions.some(s => s.glossRef === ref && s.suggestions.length > 0)
+    })
+
+    // Mark each one
+    for (const gloss of glossesWithoutUsage) {
+      await window.electronAPI.gloss.markLog(
+        `${gloss.language}:${gloss.slug}`,
+        `USAGE_EXAMPLE_CONSIDERED_IMPOSSIBLE:${gloss.language}`
+      )
+    }
+
     const suggestionDetails = suggestions.map((s) => ({
       ref: s.glossRef,
       count: s.suggestions.length,

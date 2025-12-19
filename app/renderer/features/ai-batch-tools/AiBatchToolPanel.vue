@@ -302,7 +302,34 @@ async function applySelected() {
   try {
     for (const item of proposalList) {
       const selectedTexts = item.suggestions.filter((_, idx) => item.selected[idx])
+
+      // Check if user rejected all suggestions for this item
+      if (selectedTexts.length === 0 && item.suggestions.length > 0) {
+        // User rejected all - mark appropriately
+        const baseRef = item.glossRef
+
+        if (item.kind === 'translation') {
+          const targetLang = item.direction === 'toNative'
+            ? props.nativeLanguage
+            : props.targetLanguage
+          await window.electronAPI.gloss.markLog(
+            baseRef,
+            `TRANSLATION_CONSIDERED_IMPOSSIBLE:${targetLang}`
+          )
+        } else if (item.kind === 'parts') {
+          await window.electronAPI.gloss.markLog(baseRef, 'SPLIT_CONSIDERED_UNNECESSARY')
+        } else if (item.kind === 'usage') {
+          const lang = baseRef.split(':')[0]
+          await window.electronAPI.gloss.markLog(
+            baseRef,
+            `USAGE_EXAMPLE_CONSIDERED_IMPOSSIBLE:${lang}`
+          )
+        }
+        continue  // Skip to next item
+      }
+
       if (!selectedTexts.length) continue
+
       const baseRef = item.glossRef
 
       if (item.kind === 'translation') {

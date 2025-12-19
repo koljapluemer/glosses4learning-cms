@@ -753,7 +753,32 @@ async function generateUsage() {
 async function applyAiSuggestions(selected: string[]) {
   if (!gloss.value || !aiModalKind.value) return
   aiModalOpen.value = false
+
+  // Check if all were rejected (user selected nothing but there were suggestions)
+  const allRejected = selected.length === 0 && aiModalItems.value.length > 0
+
+  if (allRejected) {
+    // Set appropriate flag based on kind
+    if (aiModalKind.value === 'translations' && otherLanguage.value) {
+      const marker = `TRANSLATION_CONSIDERED_IMPOSSIBLE:${otherLanguage.value}`
+      await window.electronAPI.gloss.markLog(`${gloss.value.language}:${gloss.value.slug}`, marker)
+      success('Marked as untranslatable')
+    } else if (aiModalKind.value === 'parts') {
+      const marker = 'SPLIT_CONSIDERED_UNNECESSARY'
+      await window.electronAPI.gloss.markLog(`${gloss.value.language}:${gloss.value.slug}`, marker)
+      success('Marked unsplittable')
+    } else if (aiModalKind.value === 'usage') {
+      const marker = `USAGE_EXAMPLE_CONSIDERED_IMPOSSIBLE:${gloss.value.language}`
+      await window.electronAPI.gloss.markLog(`${gloss.value.language}:${gloss.value.slug}`, marker)
+      success('Marked usage impossible')
+    }
+    await loadGloss()
+    emit('saved')
+    return
+  }
+
   if (!selected.length) return
+
   if (aiModalKind.value === 'translations' && otherLanguage.value) {
     for (const text of selected) {
       translationDraft.value = text
