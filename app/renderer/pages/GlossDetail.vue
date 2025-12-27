@@ -158,6 +158,72 @@
         </div>
       </div>
     </div>
+
+    <!-- Audio Pronunciations -->
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">Audio Pronunciations</h2>
+
+        <!-- Upload Button -->
+        <button
+          class="btn btn-primary"
+          @click="uploadAudio"
+          :disabled="uploadingAudio"
+        >
+          {{ uploadingAudio ? 'Uploading...' : 'Pick & Upload Audio' }}
+        </button>
+
+        <!-- Pronunciation List -->
+        <div class="space-y-4 mt-4">
+          <div
+            v-for="(pronunciation, index) in gloss.audioPronunciations"
+            :key="pronunciation.filename"
+            class="card bg-base-200"
+          >
+            <div class="card-body p-4">
+              <!-- Header Row -->
+              <div class="flex justify-between items-start">
+                <h3 class="font-semibold">{{ pronunciation.filename }}</h3>
+                <button
+                  class="btn btn-error btn-sm btn-square"
+                  @click="deleteAudioPronunciation(index)"
+                >
+                  ×
+                </button>
+              </div>
+
+              <!-- Audio Player -->
+              <audio
+                controls
+                class="w-full mt-2"
+                @error="handleAudioError(pronunciation.filename)"
+              >
+                <source :src="getAudioDataUrl(pronunciation.filename)" type="audio/mpeg">
+                Your browser does not support the audio element.
+              </audio>
+
+              <!-- Comment Input -->
+              <div class="mt-2">
+                <label class="label">
+                  <span class="label-text">Comment</span>
+                </label>
+                <textarea
+                  v-model="pronunciation.comment"
+                  class="textarea textarea-bordered w-full"
+                  rows="2"
+                  placeholder="Optional comment (e.g., 'Formal pronunciation', 'Regional variant')..."
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div v-if="!gloss.audioPronunciations?.length" class="text-center py-8 text-base-content/50">
+            No audio pronunciations yet. Upload one above!
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div v-else class="text-center py-12">
@@ -181,6 +247,8 @@ const gloss = ref<Gloss | null>(null)
 const saving = ref(false)
 const selectedTab = ref('translations')
 const imageTab = ref('decorative')
+const uploadingAudio = ref(false)
+const audioDataCache = ref<Map<string, string>>(new Map())
 
 const relationshipFields = [
   'translations',
@@ -199,6 +267,18 @@ const relationshipFields = [
 
 onMounted(async () => {
   gloss.value = await window.electronAPI.gloss.load(props.language, props.slug)
+
+  // Initialize audioPronunciations if undefined
+  if (gloss.value && !gloss.value.audioPronunciations) {
+    gloss.value.audioPronunciations = []
+  }
+
+  // Preload audio data for existing pronunciations
+  if (gloss.value?.audioPronunciations) {
+    for (const pronunciation of gloss.value.audioPronunciations) {
+      await loadAudioData(pronunciation.filename)
+    }
+  }
 })
 
 function formatFieldName(field: string): string {
@@ -256,5 +336,91 @@ function removeRelation(field: string, ref: string) {
   if (index > -1) {
     relations.splice(index, 1)
   }
+}
+
+// Audio pronunciation methods
+async function loadAudioData(filename: string): Promise<void> {
+  try {
+    const base64 = await window.electronAPI.audio.load(filename)
+    audioDataCache.value.set(filename, base64)
+  } catch (error) {
+    console.error(`Failed to load audio: ${filename}`, error)
+  }
+}
+
+function getAudioDataUrl(filename: string): string {
+  const base64 = audioDataCache.value.get(filename)
+  return base64 ? `data:audio/mpeg;base64,${base64}` : ''
+}
+
+async function uploadAudio() {
+  if (!gloss.value) return
+
+  uploadingAudio.value = true
+  try {
+    // Pick file via dialog
+    const base64Data = await window.electronAPI.audio.pickFile()
+    if (!base64Data) {
+      uploadingAudio.value = false
+      return // User cancelled
+    }
+
+    // Calculate next index
+    const nextIndex = gloss.value.audioPronunciations?.length || 0
+
+    // Upload and process
+    const filename = await window.electronAPI.audio.upload(
+      base64Data,
+      gloss.value.slug!,
+      nextIndex
+    )
+
+    // Add to gloss
+    if (!gloss.value.audioPronunciations) {
+      gloss.value.audioPronunciations = []
+    }
+    gloss.value.audioPronunciations.push({
+      filename,
+      comment: ''
+    })
+
+    // Cache audio data
+    audioDataCache.value.set(filename, base64Data)
+
+    alert(`Audio uploaded successfully: ${filename}`)
+  } catch (error) {
+    console.error('Upload failed:', error)
+    alert('Upload failed: ' + error)
+  } finally {
+    uploadingAudio.value = false
+  }
+}
+
+async function deleteAudioPronunciation(index: number) {
+  if (!gloss.value?.audioPronunciations) return
+
+  const pronunciation = gloss.value.audioPronunciations[index]
+  if (!confirm(`Delete "${pronunciation.filename}"?`)) return
+
+  try {
+    // Delete file from storage
+    await window.electronAPI.audio.delete(pronunciation.filename)
+
+    // Remove from gloss
+    gloss.value.audioPronunciations.splice(index, 1)
+
+    // Clear cache
+    audioDataCache.value.delete(pronunciation.filename)
+
+    alert('Audio deleted successfully')
+  } catch (error) {
+    console.error('Delete failed:', error)
+    alert('Delete failed: ' + error)
+  }
+}
+
+function handleAudioError(filename: string) {
+  console.error(`Audio playback error: ${filename}`)
+  alert(`Failed to play audio: ${filename}. The file may be corrupted.`)
 }
 </script>

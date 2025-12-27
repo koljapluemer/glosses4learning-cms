@@ -4,6 +4,7 @@ import path from 'node:path'
 import { setupGlossHandlers } from './main-process/ipc/glossHandlers'
 import { setupLanguageHandlers } from './main-process/ipc/languageHandlers'
 import { setupImageHandlers } from './main-process/ipc/imageHandlers'
+import { setupAudioHandlers } from './main-process/ipc/audioHandlers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -68,6 +69,7 @@ app.whenReady().then(() => {
   // Setup IPC handlers
   setupGlossHandlers()
   setupImageHandlers()
+  setupAudioHandlers()
   setupLanguageHandlers()
 
   createWindow()

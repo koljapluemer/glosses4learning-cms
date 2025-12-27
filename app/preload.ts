@@ -67,6 +67,13 @@ export type ElectronAPI = {
     load: (filename: string) => Promise<string>
     pickFile: () => Promise<string | null>
   }
+  audio: {
+    upload: (base64Data: string, glossSlug: string, index: number) => Promise<string>
+    exists: (filename: string) => Promise<boolean>
+    delete: (filename: string) => Promise<void>
+    load: (filename: string) => Promise<string>
+    pickFile: () => Promise<string | null>
+  }
 }
 
 // Expose protected methods that allow the renderer process to use
@@ -126,6 +133,13 @@ const api: ElectronAPI = {
     delete: (filename) => ipcRenderer.invoke('image:delete', filename),
     load: (filename) => ipcRenderer.invoke('image:load', filename),
     pickFile: () => ipcRenderer.invoke('image:pickFile')
+  },
+  audio: {
+    upload: (base64Data, glossSlug, index) => ipcRenderer.invoke('audio:upload', base64Data, glossSlug, index),
+    exists: (filename) => ipcRenderer.invoke('audio:exists', filename),
+    delete: (filename) => ipcRenderer.invoke('audio:delete', filename),
+    load: (filename) => ipcRenderer.invoke('audio:load', filename),
+    pickFile: () => ipcRenderer.invoke('audio:pickFile')
   }
 }
 
